@@ -283,7 +283,6 @@ const MergePanel: React.FC<MergePanelProps> = ({ onClose }) => {
               {mergeFiles.map((entry, idx) => (
                 <div key={entry.id} className="merge-file-item">
                   <span className="mfi-order">{idx + 1}</span>
-                  <span className="mfi-icon">📄</span>
                   <span className="mfi-name" title={entry.file.name}>{entry.file.name}</span>
                   <span className="mfi-size">{fmtSize(entry.file.size)}</span>
                   <span className="mfi-btns">

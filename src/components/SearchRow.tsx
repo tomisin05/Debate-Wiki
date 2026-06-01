@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { AppState } from '../types';
 
 interface SearchRowProps {
@@ -8,6 +8,7 @@ interface SearchRowProps {
 }
 
 const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setState(prev => ({ ...prev, search: value }));
@@ -38,7 +39,6 @@ const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef }
   return (
     <div className="search-row">
       <div className="search-wrap">
-        <span className="search-icon">🔍</span>
         <input
           ref={searchInputRef}
           type="search"
@@ -46,6 +46,22 @@ const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef }
           onChange={handleSearchChange}
           placeholder='Search: "exact phrase", word1 AND word2, word1 OR word2, -exclude, fuzzy~'
         />
+      </div>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <button className="search-help" style={{ position: 'static', transform: 'none' }} type="button" onClick={() => setShowTooltip(p => !p)}>?</button>
+        {showTooltip && (
+          <div className="search-tooltip">
+            <h4>Advanced Search</h4>
+            <ul>
+              <li><code>"climate change"</code> - Exact phrase</li>
+              <li><code>climate AND change</code> - Both words required</li>
+              <li><code>climate OR warming</code> - Either word</li>
+              <li><code>climate -denial</code> - Include climate, exclude denial</li>
+              <li><code>climat~</code> - Fuzzy match (climate, climatic, etc.)</li>
+              <li><code>"global warming" AND policy -skeptic</code> - Complex queries</li>
+            </ul>
+          </div>
+        )}
       </div>
       
       <div className="scope">

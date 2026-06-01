@@ -43,7 +43,7 @@ const TopBar: React.FC<TopBarProps> = ({ state, setState, onIngestFiles, showToa
         <button className="upload-btn secondary" onClick={handleClearAll}>Clear all</button>
       )}
 
-      <button className="upload-btn secondary" onClick={onOpenMerge}>📋 Merge Docs</button>
+      <button className="upload-btn secondary" onClick={onOpenMerge}>Merge Docs</button>
 
       <input ref={fileInputRef} type="file" className="file-input" accept=".docx" multiple onChange={handleFileChange} />
 
