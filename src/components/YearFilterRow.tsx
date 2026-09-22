@@ -4,9 +4,10 @@ import { AppState } from '../types';
 interface YearFilterRowProps {
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
+  mode?: 'database' | 'local';
 }
 
-const YearFilterRow: React.FC<YearFilterRowProps> = ({ state, setState }) => {
+const YearFilterRow: React.FC<YearFilterRowProps> = ({ state, setState, mode = 'local' }) => {
   const years = useMemo(() => {
     return [...new Set(
       state.cards.map(c => c.year).filter(y => y !== null)
@@ -36,25 +37,25 @@ const YearFilterRow: React.FC<YearFilterRowProps> = ({ state, setState }) => {
     <div className="year-filter-row">
       <span className="label">Year:</span>
       
-      <select value={state.yearMin} onChange={handleYearMinChange}>
+      {mode === 'database' ? <input aria-label="Minimum year" type="number" min="1900" max="2100" placeholder="Any" value={state.yearMin} onChange={e => setState(prev => ({ ...prev, yearMin: e.target.value }))} /> : <select value={state.yearMin} onChange={handleYearMinChange}>
         <option value="">Any</option>
         {years.map(year => (
           <option key={year} value={year!}>
             {year}
           </option>
         ))}
-      </select>
+      </select>}
       
       <span className="year-range-dash">–</span>
       
-      <select value={state.yearMax} onChange={handleYearMaxChange}>
+      {mode === 'database' ? <input aria-label="Maximum year" type="number" min="1900" max="2100" placeholder="Any" value={state.yearMax} onChange={e => setState(prev => ({ ...prev, yearMax: e.target.value }))} /> : <select value={state.yearMax} onChange={handleYearMaxChange}>
         <option value="">Any</option>
         {years.map(year => (
           <option key={year} value={year!}>
             {year}
           </option>
         ))}
-      </select>
+      </select>}
       
       {showResetButton && (
         <button className="reset-link" onClick={handleResetYears}>
@@ -62,17 +63,17 @@ const YearFilterRow: React.FC<YearFilterRowProps> = ({ state, setState }) => {
         </button>
       )}
       
-      <label className="dedup-toggle" title="Hide cards that share the same tag + citation as an earlier card">
+      {mode === 'local' && <label className="dedup-toggle" title="Hide cards that share the same tag + citation as an earlier card">
         <input
           type="checkbox"
           checked={state.dedupEnabled}
           onChange={handleDedupToggle}
         />
         Hide duplicate cards
-      </label>
+      </label>}
       
       <span className="year-stats">
-        {state.cards.length > 0 && `${withYear} of ${state.cards.length} cards have a year`}
+        {mode === 'local' && state.cards.length > 0 && `${withYear} of ${state.cards.length} cards have a year`}
       </span>
     </div>
   );

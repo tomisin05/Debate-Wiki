@@ -8,6 +8,8 @@
 
 # Production
 /build
+/dist
+/dist-worker
 
 # Environment variables
 .env

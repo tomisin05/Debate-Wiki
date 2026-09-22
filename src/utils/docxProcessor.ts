@@ -1,268 +1,85 @@
 import JSZip from 'jszip';
-import { DebateCard, DebateDocument } from '../types';
+import { DOMParser, XMLSerializer, type Element as XmlElement } from '@xmldom/xmldom';
+import { DebateCard, DebateDocument } from '../types.js';
 
 const NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+type Kind = 'pocket'|'hat'|'block'|'tag'|'analytic'|'undertag'|'paragraph';
+interface Style { id:string; name:string; type:string; basedOn:string|null; ownOutline:number|null; ownBold:boolean|null; outline:number|null; bold:boolean|null }
+interface Para { index:number; kind:Kind; text:string; cite:boolean }
+const STRUCTURAL:Record<string,Kind>={Heading1:'pocket',Heading2:'hat',Heading3:'block',Heading4:'tag',Analytic:'analytic',Undertag:'undertag'};
+const CITE_IDS=new Set(['Style13ptBold','StyleStyleBold12pt','Cite','Author-Date']);
+const CITE_NAMES=new Set(['style 13 pt bold','style style bold + 12 pt','cite','author-date']);
 
-export const extractYear = (cite: string): number | null => {
-  if (!cite) return null;
-  
-  // 4-digit year
-  const fullYear = cite.match(/\b(19[5-9]\d|20[0-9]\d)\b/);
-  if (fullYear) return parseInt(fullYear[1]);
-  
-  // 2-digit shorthand
-  const shortYear = cite.match(/[''](\d{2})\b/);
-  if (shortYear) {
-    const yr = parseInt(shortYear[1]);
-    return yr <= 35 ? 2000 + yr : 1900 + yr;
+function attr(el:XmlElement|null,name:string):string|null{return el?Array.from(el.attributes).find(a=>a.localName===name)?.value??null:null}
+function child(el:XmlElement|null,name:string):XmlElement|null{return el?Array.from(el.children).find(c=>c.namespaceURI===NS&&c.localName===name)??null:null}
+function bool(el:XmlElement|null):boolean|null{if(!el)return null;const v=attr(el,'val');return v==='0'||v==='false'||v==='off'?false:true}
+function compact(s:string){return s.toLowerCase().replace(/\s+/g,'')}
+
+function parseStyles(source?:string):Map<string,Style>{
+  const out=new Map<string,Style>(); if(!source)return out;
+  const xml=new DOMParser().parseFromString(source,'application/xml');
+  for(const el of Array.from(xml.getElementsByTagNameNS(NS,'style'))){
+    const id=attr(el,'styleId');if(!id)continue;const pPr=child(el,'pPr'),rPr=child(el,'rPr');
+    const raw=attr(child(pPr,'outlineLvl'),'val'),n=raw===null?NaN:parseInt(raw,10);
+    out.set(id,{id,name:attr(child(el,'name'),'val')||'',type:attr(el,'type')||'',basedOn:attr(child(el,'basedOn'),'val'),ownOutline:Number.isFinite(n)?n:null,ownBold:bool(child(rPr,'b')),outline:null,bold:null});
   }
-  
-  return null;
-};
-
-export const extractAuthor = (cite: string): string => {
-  const m = cite.match(/^([A-Z][a-zA-Z''\-]+(?:\s+[A-Z][a-zA-Z''\-]+)*(?:\s+et\s+al\.?)?)\s+['']?\d{2}/);
-  if (m) return m[1];
-  
-  const fallback = cite.split(/[,.]/)[0].trim();
-  return fallback ? fallback.substring(0, 40) : 'Unknown';
-};
-
-export const paragraphText = (p: Element): string => {
-  const tNodes = p.getElementsByTagNameNS(NS, 't');
-  return Array.from(tNodes).map(n => n.textContent).join('').trim();
-};
-
-export const styleVal = (p: Element): string | null => {
-  const pPr = p.getElementsByTagNameNS(NS, 'pPr')[0];
-  if (!pPr) return null;
-  
-  const pStyle = pPr.getElementsByTagNameNS(NS, 'pStyle')[0];
-  if (!pStyle) return null;
-  
-  for (const a of pStyle.attributes) {
-    if (a.localName === 'val') return a.value;
-  }
-  return null;
-};
-
-export const isHeading = (p: Element, level: number): boolean => {
-  const v = styleVal(p);
-  return v === `Heading${level}` || v === `heading${level}`;
-};
-
-export const isCitation = (p: Element): boolean => {
-  const sv = styleVal(p);
-  if (sv && /^Heading/i.test(sv)) return false;
-  
-  const runs = p.getElementsByTagNameNS(NS, 'r');
-  return Array.from(runs).some(run => {
-    const rPr = run.getElementsByTagNameNS(NS, 'rPr')[0];
-    if (!rPr) return false;
-    
-    const rStyle = rPr.getElementsByTagNameNS(NS, 'rStyle')[0];
-    if (rStyle) {
-      const val = Array.from(rStyle.attributes).find(a => a.localName === 'val')?.value;
-      if (val && /Bold|Strong|13pt|Style13/i.test(val)) return true;
-    }
-    
-    return rPr.getElementsByTagNameNS(NS, 'b').length > 0;
-  });
-};
-
-export const extractParagraphsXml = (rawXml: string): string[] => {
-  const result: string[] = [];
-  let pos = 0;
-  
-  while (pos < rawXml.length) {
-    const start = rawXml.indexOf('<w:p', pos);
-    if (start === -1) break;
-    
-    const charAfter = rawXml[start + 4];
-    if (charAfter !== ' ' && charAfter !== '>' && charAfter !== '/') {
-      pos = start + 4;
-      continue;
-    }
-    
-    const tagEnd = rawXml.indexOf('>', start);
-    if (tagEnd === -1) break;
-    
-    if (rawXml[tagEnd - 1] === '/') {
-      result.push(rawXml.slice(start, tagEnd + 1));
-      pos = tagEnd + 1;
-    } else {
-      const closeTag = '</w:p>';
-      const close = rawXml.indexOf(closeTag, tagEnd);
-      if (close === -1) break;
-      result.push(rawXml.slice(start, close + closeTag.length));
-      pos = close + closeTag.length;
-    }
-  }
-  
-  return result;
-};
-
-export const stripTagsToText = (xml: string): string => {
-  if (!xml) return '';
-  
-  const out: string[] = [];
-  const re = /<w:t(?:\s[^>]*)?>([^]*?)<\/w:t>/g;
-  let m;
-  
-  while ((m = re.exec(xml)) !== null) {
-    out.push(decodeXmlEntities(m[1]));
-  }
-  
-  return out.join('');
-};
-
-export const decodeXmlEntities = (str: string): string => {
-  return str
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&');
-};
-
-export const escapeHtml = (s: string): string => {
-  return (s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-};
-
-export const normKey = (s: string): string => {
-  return (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-};
-
-export const processDocxFile = async (file: File): Promise<DebateDocument> => {
-  const arrayBuffer = await file.arrayBuffer();
-  const zip = await JSZip.loadAsync(arrayBuffer);
-  const docXmlFile = zip.file('word/document.xml');
-  
-  if (!docXmlFile) {
-    throw new Error('Invalid DOCX file: missing document.xml');
-  }
-  
-  const rawXml = await docXmlFile.async('string');
-  
-  return {
-    id: Date.now().toString(),
-    filename: file.name,
-    shortName: file.name.replace(/\.docx$/i, ''),
-    zipData: zip,
-    rawXml,
-    paragraphsXml: extractParagraphsXml(rawXml),
-  };
-};
-
-interface CardState {
-  section: string;
-  tag: string | null;
-  cite: string | null;
-  tagParaIndex: number | null;
-  citeParaIndex: number | null;
-  bodyParaIndices: number[];
-  inCard: boolean;
+  const resolve=(id:string,seen=new Set<string>()):{outline:number|null;bold:boolean|null}=>{const s=out.get(id);if(!s||seen.has(id))return{outline:null,bold:null};seen.add(id);const p=s.basedOn?resolve(s.basedOn,seen):{outline:null,bold:null};seen.delete(id);return{outline:s.ownOutline??p.outline,bold:s.ownBold??p.bold}};
+  for(const s of out.values())Object.assign(s,resolve(s.id)); return out;
 }
 
-export const parseCardsFromDoc = (doc: DebateDocument): DebateCard[] => {
-  const parser = new DOMParser();
-  const xml = parser.parseFromString(doc.rawXml, 'text/xml');
-  const paragraphs = Array.from(xml.getElementsByTagNameNS(NS, 'p'));
-  
-  let currentSection = '';
-  let cardState: CardState = newCardState();
-  const cards: DebateCard[] = [];
-  let nextCardId = 1;
+export const paragraphText=(p:XmlElement):string=>Array.from(p.getElementsByTagNameNS(NS,'t')).map(n=>n.textContent||'').join('').trim();
+export const styleVal=(p:XmlElement):string|null=>attr(child(child(p,'pPr'),'pStyle'),'val');
+function outline(p:XmlElement,s?:Style):number|null{const v=attr(child(child(p,'pPr'),'outlineLvl'),'val');if(v!==null){const n=parseInt(v,10);if(Number.isFinite(n))return n}return s?.outline??null}
+function runBold(r:XmlElement,styles:Map<string,Style>){const rp=child(r,'rPr'),direct=bool(child(rp,'b'));if(direct!==null)return direct;const id=attr(child(rp,'rStyle'),'val');return !!id&&styles.get(id)?.bold===true}
+function runSize(r:XmlElement){const v=attr(child(child(r,'rPr'),'sz'),'val');return v?parseInt(v,10)/2:null}
+function runUnderline(r:XmlElement){const v=attr(child(child(r,'rPr'),'u'),'val');return v!==null&&v!=='none'&&v!=='0'}
 
-  for (let i = 0; i < paragraphs.length; i++) {
-    const p = paragraphs[i];
-    const text = paragraphText(p);
+function classify(p:XmlElement,styles:Map<string,Style>):Kind{
+  const id=styleVal(p);if(id&&STRUCTURAL[id])return STRUCTURAL[id];const s=id?styles.get(id):undefined;
+  const token=compact(`${id||''} ${s?.name||''}`),name=compact(s?.name||id||'');
+  if(token.includes('undertag'))return'undertag';if(token.includes('analytic'))return'analytic';
+  if(/^(tags?|debatetag|heading4)$/.test(name))return'tag';
+  const level=outline(p,s),runs=Array.from(p.getElementsByTagNameNS(NS,'r'));
+  if(level===0&&runs.some(r=>runBold(r,styles)&&runSize(r)===26))return'pocket';
+  if(level===1&&runs.some(r=>runBold(r,styles)&&runSize(r)===22))return'hat';
+  if(level===2&&runs.some(r=>runBold(r,styles)&&runUnderline(r)&&runSize(r)===16))return'block';
+  if(level===3&&(s?.bold===true||runs.some(r=>runBold(r,styles))))return'tag';
+  if(level===0)return'pocket';if(level===1)return'hat';if(level===2)return'block';return'paragraph';
+}
 
-    if (isHeading(p, 1) || isHeading(p, 2) || isHeading(p, 3)) {
-      finalizeCard(doc, cardState, cards, nextCardId++);
-      cardState = newCardState();
-      if (text) currentSection = text;
-      continue;
-    }
-
-    if (isHeading(p, 4) && text.length > 4) {
-      finalizeCard(doc, cardState, cards, nextCardId++);
-      cardState = newCardState();
-      cardState.section = currentSection;
-      cardState.tag = text;
-      cardState.tagParaIndex = i;
-      
-      const next = paragraphs[i + 1];
-      if (next && isCitation(next)) {
-        cardState.cite = paragraphText(next);
-        cardState.citeParaIndex = i + 1;
-        i++;
-      }
-      cardState.inCard = true;
-      continue;
-    }
-
-    if (cardState.inCard) {
-      const hasContent = text || p.getElementsByTagNameNS(NS, 'r').length > 0;
-      if (hasContent) cardState.bodyParaIndices.push(i);
-    }
-  }
-  
-  finalizeCard(doc, cardState, cards, nextCardId++);
-  return cards;
+function citeMarked(p:XmlElement,styles:Map<string,Style>):boolean{
+  for(const r of Array.from(p.getElementsByTagNameNS(NS,'r'))){if(!paragraphText(r))continue;const id=attr(child(child(r,'rPr'),'rStyle'),'val');if(!id)continue;const name=styles.get(id)?.name.toLowerCase()||'';if(CITE_IDS.has(id)||CITE_NAMES.has(name))return true}return false;
+}
+export const isHeading=(p:XmlElement,level:number)=>styleVal(p)?.toLowerCase()===`heading${level}`;
+export const isCitation=(p:XmlElement)=>citeMarked(p,new Map());
+export const extractParagraphsXml=(raw:string):string[]=>{
+  const xml=new DOMParser().parseFromString(raw,'application/xml'),serializer=new XMLSerializer();
+  return Array.from(xml.getElementsByTagNameNS(NS,'p')).map(p=>serializer.serializeToString(p));
 };
+export const decodeXmlEntities=(s:string)=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
+export const stripTagsToText=(xml:string)=>Array.from(xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g),m=>decodeXmlEntities(m[1])).join('');
+export const escapeHtml=(s:string)=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+export const normKey=(s:string)=>(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+export const extractYear=(s:string):number|null=>{const f=s.match(/\b(19[5-9]\d|20\d{2})\b/);if(f)return+f[1];const m=s.match(/['’](\d{2})\b/);if(!m)return null;const n=+m[1];return n<=35?2000+n:1900+n};
+export const extractAuthor=(s:string):string=>{const m=s.match(/^([A-Z][a-zA-Z'’\-]+(?:\s+[A-Z][a-zA-Z'’\-]+)*(?:\s+et\s+al\.?)?)\s+['’]?\d{2}/),f=s.split(/[,.]/)[0].trim();return m?.[1]||f.substring(0,40)||'Unknown'};
 
-const newCardState = (): CardState => ({
-  section: '',
-  tag: null,
-  cite: null,
-  tagParaIndex: null,
-  citeParaIndex: null,
-  bodyParaIndices: [],
-  inCard: false,
-});
+export async function processDocxFile(file:File, metadata?:Partial<Pick<DebateDocument,'sourcePath'|'collection'|'school'|'teamName'>>):Promise<DebateDocument>{
+  const zip=await JSZip.loadAsync(await file.arrayBuffer()),part=zip.file('word/document.xml');if(!part)throw new Error('Invalid DOCX file: missing word/document.xml');
+  const rawXml=await part.async('string'),stylesXml=await zip.file('word/styles.xml')?.async('string');
+  return{id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`,filename:file.name,shortName:file.name.replace(/\.docx$/i,''),zipData:zip,rawXml,stylesXml,paragraphsXml:extractParagraphsXml(rawXml),...metadata};
+}
+function parseParagraphs(doc:DebateDocument):Para[]{const xml=new DOMParser().parseFromString(doc.rawXml,'application/xml');if(xml.getElementsByTagName('parsererror').length)throw new Error('Invalid word/document.xml');const styles=parseStyles(doc.stylesXml);return Array.from(xml.getElementsByTagNameNS(NS,'p')).map((p,index)=>({index,kind:classify(p,styles),text:paragraphText(p),cite:citeMarked(p,styles)}))}
 
-const finalizeCard = (
-  doc: DebateDocument, 
-  s: CardState, 
-  cards: DebateCard[], 
-  cardId: number
-): void => {
-  if (!s.tag) return;
-  
-  const bodyPlain = s.bodyParaIndices
-    .map(idx => stripTagsToText(doc.paragraphsXml[idx]))
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const year = extractYear(s.cite || '');
-  const dupKey = normKey(s.tag) + '|||' + normKey(s.cite || '');
-
-  const card: DebateCard = {
-    id: `${doc.id}-${cardId}`,
-    docId: doc.id,
-    docName: doc.shortName,
-    section: s.section || '',
-    tag: s.tag,
-    cite: s.cite || '',
-    tagParaIndex: s.tagParaIndex,
-    citeParaIndex: s.citeParaIndex,
-    bodyParaIndices: [...s.bodyParaIndices],
-    bodyPlain,
-    year,
-    dupKey,
-    searchTag: s.tag.toLowerCase(),
-    searchCite: (s.cite || '').toLowerCase(),
-    searchBody: bodyPlain.toLowerCase(),
-    searchAll: (s.tag + ' ' + (s.cite || '') + ' ' + bodyPlain).toLowerCase(),
-    snippetHtml: escapeHtml(bodyPlain.substring(0, 200)),
-    author: extractAuthor(s.cite || ''),
-  };
-  
-  cards.push(card);
-};
+export function parseCardsFromDoc(doc:DebateDocument):DebateCard[]{
+  const ps=parseParagraphs(doc),cards:DebateCard[]=[],heads:Partial<Record<'pocket'|'hat'|'block',string>>={};
+  for(let i=0;i<ps.length;){const p=ps[i];
+    if(p.kind==='pocket'||p.kind==='hat'||p.kind==='block'){heads[p.kind]=p.text;if(p.kind==='pocket'){delete heads.hat;delete heads.block}else if(p.kind==='hat')delete heads.block;i++;continue}
+    if(p.kind!=='tag'){i++;continue}
+    const undertags:number[]=[],cites:number[]=[],bodies:number[]=[];let j=i+1;
+    while(j<ps.length&&ps[j].kind==='undertag')undertags.push(ps[j++].index);
+    while(j<ps.length&&ps[j].kind==='paragraph'){const q=ps[j++];(q.cite?cites:bodies).push(q.index)}
+    const cite=cites.map(x=>stripTagsToText(doc.paragraphsXml[x])).filter(Boolean).join(' '),bodyPlain=bodies.map(x=>stripTagsToText(doc.paragraphsXml[x])).join(' ').replace(/\s+/g,' ').trim(),section=[heads.pocket,heads.hat,heads.block].filter(Boolean).join(' › ');
+    if (!bodyPlain) { i=j; continue; }
+    cards.push({id:`${doc.id}-${cards.length+1}`,docId:doc.id,docName:doc.shortName,section,tag:p.text,cite,tagParaIndex:p.index,citeParaIndex:cites[0]??null,citeParaIndices:cites,undertagParaIndices:undertags,bodyParaIndices:bodies,bodyPlain,year:extractYear(cite),dupKey:`${normKey(p.text)}|||${normKey(cite)}`,searchTag:p.text.toLowerCase(),searchCite: cite.toLowerCase(),searchBody:bodyPlain.toLowerCase(),searchAll:`${p.text} ${cite} ${bodyPlain}`.toLowerCase(),snippetHtml:escapeHtml(bodyPlain.substring(0,200)),author:extractAuthor(cite)});i=j;
+  }return cards;
+}

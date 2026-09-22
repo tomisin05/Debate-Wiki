@@ -1,0 +1,9 @@
+substitutions:
+  _IMAGE: us-east1-docker.pkg.dev/$PROJECT_ID/debate-wiki/server:latest
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'worker/Dockerfile', '-t', '${_IMAGE}', '.']
+
+images:
+  - '${_IMAGE}'

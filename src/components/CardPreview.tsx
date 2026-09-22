@@ -32,7 +32,8 @@ function buildCardXml(card: DebateCard, doc: DebateDocument, bodyOnly = false): 
   const keep = new Set<number>();
   if (!bodyOnly) {
     if (card.tagParaIndex !== null) keep.add(card.tagParaIndex);
-    if (card.citeParaIndex !== null) keep.add(card.citeParaIndex);
+    (card.citeParaIndices || (card.citeParaIndex !== null ? [card.citeParaIndex] : [])).forEach(i => keep.add(i));
+    (card.undertagParaIndices || []).forEach(i => keep.add(i));
   }
   card.bodyParaIndices.forEach(i => keep.add(i));
   const bodyParas = doc.paragraphsXml
@@ -92,15 +93,20 @@ function xmlParaToHtml(paraXml: string): string {
     if (!text) continue;
 
     const styles: string[] = [];
-    let isBold = false, isUnderline = false;
+    let isBold = false, isBoldOff = false, isUnderline = false;
 
     if (rPr) {
-      if (rPr.getElementsByTagNameNS(NS_W, 'b').length) isBold = true;
+      const bEl = rPr.getElementsByTagNameNS(NS_W, 'b')[0];
+      if (bEl) {
+        if (['0', 'false', 'off'].includes(attr(bEl, 'val') || '')) isBoldOff = true;
+        else isBold = true;
+      }
 
       const uEl = rPr.getElementsByTagNameNS(NS_W, 'u')[0];
       if (uEl && attr(uEl, 'val') !== 'none') isUnderline = true;
 
-      if (rPr.getElementsByTagNameNS(NS_W, 'i').length) styles.push('font-style:italic');
+      const iEl = rPr.getElementsByTagNameNS(NS_W, 'i')[0];
+      if (iEl && !['0', 'false', 'off'].includes(attr(iEl, 'val') || '')) styles.push('font-style:italic');
 
       const szEl = rPr.getElementsByTagNameNS(NS_W, 'sz')[0];
       if (szEl) {
@@ -141,12 +147,13 @@ function xmlParaToHtml(paraXml: string): string {
         if (/^Emphasis$/i.test(sv)) { isBold = true; isUnderline = true; styles.push('border:1px solid #000;padding:0 1px'); }
         else if (/^StyleUnderline$/i.test(sv)) isUnderline = true;
         else if (/underline/i.test(sv)) isUnderline = true;
-        else if (/bold/i.test(sv)) { isBold = true; isUnderline = true; }
-        if (/13pt|Style13/i.test(sv)) { isBold = true; if (!styles.some(s => s.startsWith('font-size'))) styles.push('font-size:10pt'); }
+        else if (/bold/i.test(sv)) isBold = true;
+        if (/13pt|Style13/i.test(sv)) { isBold = true; if (!styles.some(s => s.startsWith('font-size'))) styles.push('font-size:13pt'); }
       }
     }
 
-    if (isBold) styles.push('font-weight:bold');
+    if (isBoldOff) styles.push('font-weight:normal');
+    else if (isBold) styles.push('font-weight:bold');
     if (isUnderline) styles.push('text-decoration:underline');
 
     const styleAttr = styles.length ? ` style="${styles.join(';')}"` : '';
@@ -198,6 +205,22 @@ const CardPreview: React.FC<CardPreviewProps> = ({ card, docs, onStepSelection, 
       return;
     }
 
+    if (doc.remote) {
+      currentBlobRef.current = null;
+      const parts: string[] = [];
+      if (c.section) parts.push(`<div class="ch-section">${escapeHtml(c.section)}</div>`);
+      parts.push(`<div class="ch-tag">${c.tagParaIndex !== null ? xmlParaToHtml(doc.paragraphsXml[c.tagParaIndex]) : escapeHtml(c.tag)}</div>`);
+      for (const idx of c.undertagParaIndices || []) parts.push(`<div class="ch-undertag">${xmlParaToHtml(doc.paragraphsXml[idx])}</div>`);
+      const citeIndices = c.citeParaIndices || [];
+      if (c.cite) parts.push(`<div class="ch-cite">${citeIndices.length ? citeIndices.map(idx => xmlParaToHtml(doc.paragraphsXml[idx])).join('') : escapeHtml(c.cite)}</div>`);
+      if (c.year) parts.push(`<div class="ch-year">${c.year}</div>`);
+      parts.push('<div class="ch-divider"></div>');
+      const body = c.bodyParaIndices.map(idx => xmlParaToHtml(doc.paragraphsXml[idx])).join('');
+      bodyEl.innerHTML = `<div class="card-header-block">${parts.join('')}</div><div class="stored-card-body">${body}</div>`;
+      bodyEl.scrollTop = 0;
+      return;
+    }
+
     bodyEl.innerHTML = `<div class="preview-loading"><div class="spinner"></div>Rendering card...</div>`;
 
     let blob: Blob;
@@ -223,9 +246,14 @@ const CardPreview: React.FC<CardPreviewProps> = ({ card, docs, onStepSelection, 
         if (c.tagParaIndex !== null) { tagEl.innerHTML = xmlParaToHtml(doc.paragraphsXml[c.tagParaIndex]); }
         else { tagEl.textContent = c.tag; }
         headerEl.appendChild(tagEl);
+        for (const idx of c.undertagParaIndices || []) {
+          const el = document.createElement('div'); el.className = 'ch-undertag';
+          el.innerHTML = xmlParaToHtml(doc.paragraphsXml[idx]); headerEl.appendChild(el);
+        }
         if (c.cite) {
           const el = document.createElement('div'); el.className = 'ch-cite';
-          if (c.citeParaIndex !== null) { el.innerHTML = xmlParaToHtml(doc.paragraphsXml[c.citeParaIndex]); }
+          const citeIndices = c.citeParaIndices || (c.citeParaIndex !== null ? [c.citeParaIndex] : []);
+          if (citeIndices.length) { el.innerHTML = citeIndices.map(idx => xmlParaToHtml(doc.paragraphsXml[idx])).join(''); }
           else { el.textContent = c.cite; }
           headerEl.appendChild(el);
         }
@@ -276,9 +304,11 @@ const CardPreview: React.FC<CardPreviewProps> = ({ card, docs, onStepSelection, 
     const tagHtml = card.tagParaIndex !== null
       ? `<h4 style="font-family:Arial,sans-serif;font-size:14pt;margin:0 0 4px 0;">${xmlParaToHtml(doc.paragraphsXml[card.tagParaIndex]).replace(/^<p[^>]*>|<\/p>$/g, '')}</h4>`
       : `<h4 style="font-family:Arial,sans-serif;font-size:14pt;font-weight:bold;margin:0 0 4px 0;">${escapeHtml(card.tag)}</h4>`;
+    const citeIndices = card.citeParaIndices || (card.citeParaIndex !== null ? [card.citeParaIndex] : []);
+    const undertagHtml = (card.undertagParaIndices || []).map(idx => xmlParaToHtml(doc.paragraphsXml[idx])).join('');
     const citeHtml = card.cite
-      ? (card.citeParaIndex !== null
-          ? `<p style="font-family:Arial,sans-serif;font-size:10pt;margin:0 0 8px 0;">${xmlParaToHtml(doc.paragraphsXml[card.citeParaIndex]).replace(/^<p[^>]*>|<\/p>$/g, '')}</p>`
+      ? (citeIndices.length
+          ? citeIndices.map(idx => `<p style="font-family:Arial,sans-serif;font-size:10pt;margin:0 0 8px 0;">${xmlParaToHtml(doc.paragraphsXml[idx]).replace(/^<p[^>]*>|<\/p>$/g, '')}</p>`).join('')
           : `<p style="font-family:Arial,sans-serif;font-size:10pt;font-weight:bold;margin:0 0 8px 0;">${escapeHtml(card.cite)}</p>`)
       : '';
 
@@ -294,7 +324,7 @@ const CardPreview: React.FC<CardPreviewProps> = ({ card, docs, onStepSelection, 
       if (t) plainParts.push(t);
     });
     const plainText = plainParts.join('\n\n');
-    const htmlContent = `<div style="font-family:Arial,sans-serif;font-size:12pt;line-height:1.4;color:#000;">${sectionHtml}${tagHtml}${citeHtml}${bodyHtml}</div>`;
+    const htmlContent = `<div style="font-family:Arial,sans-serif;font-size:12pt;line-height:1.4;color:#000;">${sectionHtml}${tagHtml}${undertagHtml}${citeHtml}${bodyHtml}</div>`;
 
     try {
       await writeClipboard(plainText, htmlContent);
@@ -325,6 +355,7 @@ const CardPreview: React.FC<CardPreviewProps> = ({ card, docs, onStepSelection, 
     if (!card) return;
     const doc = docs.get(card.docId);
     if (!doc) return;
+    if (doc.remote) { showToast('DOCX download will be available after archive storage is connected'); return; }
     const blob = currentBlobRef.current || await buildCardDocx(card, doc);
     downloadFile(blob, safeFilename(card, doc));
   };
@@ -334,7 +365,7 @@ const CardPreview: React.FC<CardPreviewProps> = ({ card, docs, onStepSelection, 
       <div className="preview-toolbar" style={{ display: card ? '' : 'none' }}>
         <button className="primary" onClick={handleCopyFormatted}>Copy formatted</button>
         <button onClick={handleCopyPlain}>Copy plain text</button>
-        <button onClick={handleDownload}>Download .docx</button>
+        <button onClick={handleDownload} disabled={!!(card && docs.get(card.docId)?.remote)} title={card && docs.get(card.docId)?.remote ? 'Archive storage is not connected yet' : ''}>Download .docx</button>
         <span className="spacer"></span>
         <button onClick={() => onStepSelection(-1)}>← Prev</button>
         <button onClick={() => onStepSelection(1)}>Next →</button>

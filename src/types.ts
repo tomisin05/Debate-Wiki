@@ -7,6 +7,8 @@ export interface DebateCard {
   cite: string;
   tagParaIndex: number | null;
   citeParaIndex: number | null;
+  citeParaIndices?: number[];
+  undertagParaIndices?: number[];
   bodyParaIndices: number[];
   bodyPlain: string;
   year: number | null;
@@ -30,6 +32,12 @@ export interface DebateDocument {
   zipData: any;
   rawXml: string;
   paragraphsXml: string[];
+  stylesXml?: string;
+  sourcePath?: string;
+  collection?: string;
+  school?: string;
+  teamName?: string;
+  remote?: boolean;
   userId?: string;
   createdAt?: Date;
 }
@@ -43,7 +51,11 @@ export interface AppState {
   searchScope: 'all' | 'tag' | 'cite' | 'body';
   docFilter: string;
   sectionFilter: string;
-  sortOrder: 'doc' | 'alpha' | 'year-new' | 'year-old' | 'taglen' | 'relevance';
+  collectionFilter: string;
+  schoolFilter: string;
+  teamFilter: string;
+  authorFilter: string;
+  sortOrder: 'doc' | 'alpha' | 'year-new' | 'year-old' | 'taglen' | 'relevance' | 'newest';
   yearMin: string;
   yearMax: string;
   dedupEnabled: boolean;

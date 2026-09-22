@@ -9,6 +9,12 @@ interface CardListProps {
   search: string;
   sortOrder: string;
   docsCount: number;
+  loading?: boolean;
+  error?: string;
+  total?: number;
+  page?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
 }
 
 const CardList: React.FC<CardListProps> = ({ 
@@ -17,7 +23,13 @@ const CardList: React.FC<CardListProps> = ({
   onCardSelect, 
   search, 
   sortOrder, 
-  docsCount 
+  docsCount,
+  loading = false,
+  error,
+  total,
+  page = 1,
+  totalPages = 1,
+  onPageChange,
 }) => {
   const RENDER_CAP = 1000;
   const visible = cards.slice(0, RENDER_CAP);
@@ -32,7 +44,15 @@ const CardList: React.FC<CardListProps> = ({
     );
   };
 
-  if (docsCount === 0) {
+  if (loading && cards.length === 0) {
+    return <div className="left-pane"><div className="empty-msg"><div className="spinner"></div>Searching all cards...</div></div>;
+  }
+
+  if (error) {
+    return <div className="left-pane"><div className="empty-msg">Could not load cards.<br />{error}</div></div>;
+  }
+
+  if (docsCount === 0 && total === undefined) {
     return (
       <div className="left-pane">
         <div className="pane-header">
@@ -60,7 +80,7 @@ const CardList: React.FC<CardListProps> = ({
   return (
     <div className="left-pane">
       <div className="pane-header">
-        <span>{cards.length} of {cards.length} cards</span>
+        <span>{cards.length} of {total ?? cards.length} cards{loading ? ' · updating...' : ''}</span>
         <div className="right">
           <button className="btn-link">Download all as ZIP</button>
         </div>
@@ -116,6 +136,13 @@ const CardList: React.FC<CardListProps> = ({
         {overflow > 0 && (
           <div className="empty-msg" style={{ padding: '18px' }}>
             Showing first {RENDER_CAP} of {cards.length}. Narrow your search to see more.
+          </div>
+        )}
+        {onPageChange && totalPages > 1 && (
+          <div className="pagination">
+            <button disabled={page <= 1 || loading} onClick={() => onPageChange(page - 1)}>Previous</button>
+            <span>Page {page} of {totalPages}</span>
+            <button disabled={page >= totalPages || loading} onClick={() => onPageChange(page + 1)}>Next</button>
           </div>
         )}
       </div>

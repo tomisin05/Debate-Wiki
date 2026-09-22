@@ -334,6 +334,17 @@ body {
   background: var(--color-background-primary);
   color: var(--color-text-primary);
 }
+.year-filter-row input,
+.search-row .author-filter {
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+.year-filter-row input { width: 78px; }
+.search-row .author-filter { width: 110px; }
 
 .dedup-toggle {
   display: inline-flex;
@@ -540,6 +551,30 @@ body {
   gap: 8px;
   align-items: center;
 }
+.pagination {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  background: var(--color-background-secondary);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.pagination button {
+  padding: 6px 10px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary);
+  cursor: pointer;
+}
+.pagination button:disabled { opacity: 0.4; cursor: default; }
+.stored-card-body { padding: 16px 40px 28px; font-family: var(--font-serif); font-size: 13px; line-height: 1.45; }
+.stored-card-body p { margin: 0 0 8px; }
+.preview-toolbar button:disabled { opacity: 0.4; cursor: default; }
 .btn-link {
   background: none;
   border: none;

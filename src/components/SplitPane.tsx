@@ -7,16 +7,19 @@ interface SplitPaneProps {
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   showToast: (message: string) => void;
+  onCardSelect?: (card: DebateCard) => void;
+  searchStatus?: { loading: boolean; error?: string; total: number; page: number; totalPages: number; onPageChange: (page: number) => void };
 }
 
-const SplitPane: React.FC<SplitPaneProps> = ({ state, setState, showToast }) => {
+const SplitPane: React.FC<SplitPaneProps> = ({ state, setState, showToast, onCardSelect, searchStatus }) => {
   const handleCardSelect = useCallback((card: DebateCard) => {
+    if (onCardSelect) { onCardSelect(card); return; }
     setState(prev => ({ 
       ...prev, 
       selectedCardId: card.id,
       currentPreviewCard: card 
     }));
-  }, [setState]);
+  }, [setState, onCardSelect]);
 
   const handleStepSelection = useCallback((direction: number) => {
     if (!state.filtered.length) return;
@@ -45,6 +48,12 @@ const SplitPane: React.FC<SplitPaneProps> = ({ state, setState, showToast }) => 
         search={state.search}
         sortOrder={state.sortOrder}
         docsCount={state.docs.size}
+        loading={searchStatus?.loading}
+        error={searchStatus?.error}
+        total={searchStatus?.total}
+        page={searchStatus?.page}
+        totalPages={searchStatus?.totalPages}
+        onPageChange={searchStatus?.onPageChange}
       />
       <CardPreview
         card={state.currentPreviewCard}

@@ -4,15 +4,29 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1138.0",
+    "@aws-sdk/s3-request-presigner": "^3.1138.0",
+    "@google-cloud/pubsub": "^6.1.0",
+    "@xmldom/xmldom": "^0.9.12",
+    "dotenv": "^18.0.3",
     "firebase": "^12.14.0",
+    "firebase-admin": "^14.4.0",
     "jszip": "^3.10.1",
+    "pg": "^8.23.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "worker:build": "tsc -p tsconfig.worker.json",
+    "worker:start": "node dist-worker/worker/src/server.js",
+    "ingest": "tsx worker/src/cli.ts",
+    "ingest:dry": "tsx worker/src/cli.ts --dry-run",
+    "db:verify": "tsx worker/src/verify.ts",
+    "upload:verify": "tsx worker/src/verify-upload.ts",
+    "r2:cors:verify": "tsx worker/src/verify-cors.ts"
   },
   "eslintConfig": {
     "extends": [
@@ -35,9 +49,11 @@
   "devDependencies": {
     "@types/jszip": "^3.4.1",
     "@types/node": "^20.0.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",
+    "tsx": "^4.23.15",
     "typescript": "^4.9.5",
     "vite": "^5.0.0"
   }

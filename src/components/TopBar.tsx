@@ -9,9 +9,12 @@ interface TopBarProps {
   showToast: (message: string) => void;
   dupCount: number;
   onOpenMerge: () => void;
+  mode?: 'database' | 'local';
+  libraryStats?: { documents: number; cards: number; shown: number };
+  onReturnLibrary?: () => void;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ state, setState, onIngestFiles, showToast, dupCount, onOpenMerge }) => {
+const TopBar: React.FC<TopBarProps> = ({ state, setState, onIngestFiles, showToast, dupCount, onOpenMerge, mode = 'local', libraryStats, onReturnLibrary }) => {
   const { user, logout } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,22 +39,23 @@ const TopBar: React.FC<TopBarProps> = ({ state, setState, onIngestFiles, showToa
       <h1>Debate Wiki <span className="accent">multi-doc</span></h1>
 
       <button className="upload-btn" onClick={() => fileInputRef.current?.click()}>
-        + Add documents
+        + Add documents or ZIP
       </button>
 
-      {state.docs.size > 0 && (
+      {mode === 'local' && state.docs.size > 0 && (
         <button className="upload-btn secondary" onClick={handleClearAll}>Clear all</button>
       )}
+      {mode === 'local' && onReturnLibrary && <button className="upload-btn secondary" onClick={onReturnLibrary}>Back to library</button>}
 
       <button className="upload-btn secondary" onClick={onOpenMerge}>Merge Docs</button>
 
-      <input ref={fileInputRef} type="file" className="file-input" accept=".docx" multiple onChange={handleFileChange} />
+      <input ref={fileInputRef} type="file" className="file-input" accept=".docx,.zip" multiple onChange={handleFileChange} />
 
       <div className="stats-inline">
-        <span className="stat-pill"><b>{state.docs.size}</b>documents</span>
-        <span className="stat-pill"><b>{state.cards.length}</b>cards</span>
-        <span className="stat-pill"><b>{dupCount}</b>duplicates hidden</span>
-        <span className="stat-pill"><b>{state.filtered.length}</b>shown</span>
+        <span className="stat-pill"><b>{libraryStats?.documents ?? state.docs.size}</b>documents</span>
+        <span className="stat-pill"><b>{libraryStats?.cards ?? state.cards.length}</b>cards</span>
+        {mode === 'local' && <span className="stat-pill"><b>{dupCount}</b>duplicates hidden</span>}
+        <span className="stat-pill"><b>{libraryStats?.shown ?? state.filtered.length}</b>shown</span>
       </div>
 
       <div className="user-menu">
