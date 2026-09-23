@@ -221,3 +221,45 @@ Useful log commands:
 gcloud run services logs read "$API_SERVICE" --region="$REGION" --limit=100
 gcloud run services logs read "$WORKER_SERVICE" --region="$REGION" --limit=100
 ```
+
+No. With the current setup, pushing to GitHub does **not** automatically update the Cloud Run API or worker.
+
+Your deployment currently uses this flow:
+
+1. Push code to GitHub.
+2. Open Cloud Shell.
+3. Pull the latest code:
+
+```bash
+cd ~/Debate-Wiki
+git pull
+```
+
+4. Build a new image:
+
+```bash
+export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/server:$(date +%Y%m%d-%H%M%S)"
+
+gcloud builds submit \
+  --config=cloudbuild.yaml \
+  --substitutions="_IMAGE=${IMAGE}" \
+  .
+```
+
+5. Deploy the new image to both services:
+
+```bash
+gcloud run services update "$API_SERVICE" \
+  --region="$REGION" \
+  --image="$IMAGE"
+
+gcloud run services update "$WORKER_SERVICE" \
+  --region="$REGION" \
+  --image="$IMAGE"
+```
+
+Cloud Run creates new revisions and routes traffic to them. Your secrets and environment variables remain configured.
+
+Vercel normally redeploys the frontend automatically when you push to its configured production branch. Cloud Run will only do that if you later configure a Cloud Build GitHub trigger.
+
+I recommend using manual API deployments until the production workflow has been tested. Afterward, add a GitHub trigger that builds the image and updates both Cloud Run services.
