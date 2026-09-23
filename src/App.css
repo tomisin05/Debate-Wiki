@@ -753,6 +753,12 @@ body {
   color: var(--color-text-primary);
   font-weight: 500;
 }
+.preview-footer .source-link {
+  text-decoration: none;
+}
+.preview-footer .source-link:hover {
+  text-decoration: underline;
+}
 .preview-footer .source-section {
   margin-left: auto;
   color: var(--color-text-tertiary);

@@ -61,6 +61,12 @@ function safeFilename(card: DebateCard, doc: DebateDocument): string {
   return `${clean(doc.shortName).substring(0, 20)}__${clean(card.author)}_${clean(card.tag).substring(0, 30)}.docx`;
 }
 
+function openCaselistUrl(doc: DebateDocument): string | null {
+  if (!doc.sourcePath) return null;
+  const path = doc.sourcePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  return `https://api.opencaselist.com/v1/download?path=${encodeURIComponent(path)}`;
+}
+
 const NS_W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
 const HL_MAP: Record<string, string> = {
@@ -389,7 +395,17 @@ const CardPreview: React.FC<CardPreviewProps> = ({ card, docs, onStepSelection, 
       {card && docs.get(card.docId) && (
         <div className="preview-footer">
           <span className="label">Source</span>
-          <span className="source-name">{docs.get(card.docId)!.filename}</span>
+          {openCaselistUrl(docs.get(card.docId)!) ? (
+            <a
+              className="source-name source-link"
+              href={openCaselistUrl(docs.get(card.docId)!)!}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Download the original document from OpenCaselist"
+            >
+              {docs.get(card.docId)!.filename}
+            </a>
+          ) : <span className="source-name">{docs.get(card.docId)!.filename}</span>}
           <span className="source-section">{card.section || ''}</span>
         </div>
       )}
