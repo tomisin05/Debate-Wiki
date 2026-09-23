@@ -48,6 +48,14 @@ GET /api/filters
 
 Returns the available collections, schools, and team names.
 
+## Download a card as DOCX
+
+```http
+GET /api/cards/{cardId}/download?sourceId={sourceId}
+```
+
+The API downloads the original archive from R2, extracts the source DOCX, rebuilds it with the selected card paragraphs, and returns a Word document. `sourceId` selects the exact source occurrence shown in the preview and may be omitted to use the first source.
+
 ## Health check
 
 ```http

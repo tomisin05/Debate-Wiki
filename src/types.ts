@@ -23,6 +23,7 @@ export interface DebateCard {
   userId?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  sourceId?: string;
 }
 
 export interface DebateDocument {

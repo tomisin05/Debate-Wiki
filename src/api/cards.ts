@@ -5,6 +5,7 @@ import { auth } from '../firebase';
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
 
 export interface ApiSource {
+  sourceId: string;
   documentId: string;
   filename: string;
   sourcePath: string;
@@ -45,6 +46,16 @@ export async function searchCards(params: URLSearchParams, signal?: AbortSignal)
 }
 export async function getCard(id: string, signal?: AbortSignal): Promise<ApiCard> { return request(`/api/cards/${id}`, signal); }
 export async function getFilters(signal?: AbortSignal): Promise<FilterResponse> { return request('/api/filters', signal); }
+export async function downloadCardDocx(cardId: string, sourceId?: string) {
+  const params = sourceId ? `?sourceId=${encodeURIComponent(sourceId)}` : '';
+  const response = await fetch(`${API_URL}/api/cards/${cardId}/download${params}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `Download API returned ${response.status}.`);
+  }
+  const disposition = response.headers.get('content-disposition') || '';
+  return { blob: await response.blob(), filename: disposition.match(/filename="([^"]+)"/)?.[1] || 'debate-card.docx' };
+}
 
 export async function uploadArchive(file: File, onProgress: (percent: number, label: string) => void): Promise<IngestionJob> {
   const token = await adminToken();
@@ -128,6 +139,7 @@ export function materializeCard(apiCard: ApiCard, source = apiCard.source ?? api
     searchTag: apiCard.tag.toLowerCase(), searchCite: apiCard.cite.toLowerCase(),
     searchBody: apiCard.body.toLowerCase(), searchAll: `${apiCard.tag} ${apiCard.cite} ${apiCard.body}`.toLowerCase(),
     snippetHtml: escapeHtml(apiCard.body.substring(0, 200)), searchScore: apiCard.score ? apiCard.score * 100 : undefined,
+    sourceId: source.sourceId,
   };
   return { card, doc };
 }

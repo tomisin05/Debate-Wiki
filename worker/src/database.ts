@@ -55,6 +55,10 @@ export class CardRepository {
         'select id, processing_status from public.documents where file_hash=$1 for update', [doc.fileHash],
       );
       if (existing.rows[0]?.processing_status === 'completed') {
+        await client.query(
+          `update public.documents set storage_key=$2, source_path=$3, collection_name=$4, school=$5, team_name=$6 where id=$1`,
+          [existing.rows[0].id, `${storageKey}#${doc.sourcePath}`, doc.sourcePath, doc.collection, doc.school, doc.teamName],
+        );
         await client.query('commit');
         return { skipped: true, uniqueCards: 0, duplicateCards: doc.cards.length };
       }

@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { AuthError, requireAdmin } from './auth.js';
 import { UploadRepository } from './uploads.js';
 import { PubSub } from '@google-cloud/pubsub';
+import { buildStoredCardDocx } from './download.js';
 
 interface JobMessage { jobId: string; storageKey: string; archiveName: string }
 const port = Number(process.env.PORT || 8080);
@@ -66,6 +67,23 @@ createServer(async (request, response) => {
     try {
       const card = await searchRepository.getCard(cardMatch[1]);
       return card ? json(response, 200, card) : json(response, 404, { error: 'Card not found' });
+    } catch (error) { return apiError(response, error); }
+  }
+  const downloadMatch = request.method === 'GET' && url.pathname.match(/^\/api\/cards\/([0-9a-f-]{36})\/download$/i);
+  if (downloadMatch) {
+    try {
+      const sourceId = url.searchParams.get('sourceId') || undefined;
+      if (sourceId && !/^[0-9a-f-]{36}$/i.test(sourceId)) throw new HttpError(400, 'Invalid sourceId.');
+      const source = await searchRepository.getDownloadSource(downloadMatch[1], sourceId);
+      if (!source) return json(response, 404, { error: 'Card source not found' });
+      const file = await buildStoredCardDocx(source);
+      response.writeHead(200, {
+        'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'content-disposition': `attachment; filename="${file.filename}"`,
+        'content-length': String(file.bytes.byteLength),
+        'cache-control': 'private, no-store',
+      });
+      return response.end(file.bytes);
     } catch (error) { return apiError(response, error); }
   }
   if (request.method !== 'POST' || url.pathname !== '/ingest' || serviceRole === 'api') return json(response, 404, { error: 'Not found' });
@@ -160,6 +178,7 @@ function setCors(response: import('node:http').ServerResponse) {
   response.setHeader('access-control-allow-origin', process.env.CORS_ORIGIN || 'http://localhost:5173');
   response.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
   response.setHeader('access-control-allow-headers', 'content-type,authorization');
+  response.setHeader('access-control-expose-headers', 'content-disposition');
 }
 
 function parseMessage(body: string): JobMessage {

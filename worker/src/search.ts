@@ -80,14 +80,14 @@ export class SearchRepository {
       )
       select c.id, c.tag, c.cite, c.body_text, c.author, c.evidence_year,
              c.source_count, c.score, count(*) over()::int as total,
-             source.document_id, source.filename, source.source_path,
+             source.source_id, source.document_id, source.filename, source.source_path,
              source.collection_name, source.school, source.team_name,
              source.section_path, source.tag_paragraph_index,
              source.cite_paragraph_indices, source.undertag_paragraph_indices,
              source.body_paragraph_indices, source.formatted_paragraphs
       from matched c
       left join lateral (
-        select cs.document_id, d.filename, d.source_path, d.collection_name,
+        select cs.id source_id, cs.document_id, d.filename, d.source_path, d.collection_name,
                d.school, d.team_name, cs.section_path, cs.tag_paragraph_index,
                cs.cite_paragraph_indices, cs.undertag_paragraph_indices,
                cs.body_paragraph_indices, cs.formatted_paragraphs
@@ -122,7 +122,7 @@ export class SearchRepository {
     );
     if (!cardResult.rows[0]) return null;
     const sources = await this.pool.query(`
-      select cs.document_id, d.filename, d.source_path, d.collection_name,
+      select cs.id source_id, cs.document_id, d.filename, d.source_path, d.collection_name,
              d.school, d.team_name, cs.section_path, cs.tag_paragraph_index,
              cs.cite_paragraph_indices, cs.undertag_paragraph_indices,
              cs.body_paragraph_indices, cs.formatted_paragraphs
@@ -149,6 +149,21 @@ export class SearchRepository {
       cards: stats.rows[0].cards,
     };
   }
+
+  async getDownloadSource(cardId: string, sourceId?: string) {
+    const result = await this.pool.query(`
+      select c.tag, c.author, cs.id source_id, cs.document_id, d.filename, d.storage_key,
+             d.source_path, cs.tag_paragraph_index, cs.cite_paragraph_indices,
+             cs.undertag_paragraph_indices, cs.body_paragraph_indices
+      from public.cards c
+      join public.card_sources cs on cs.card_id=c.id
+      join public.documents d on d.id=cs.document_id
+      where c.id=$1 and ($2::uuid is null or cs.id=$2)
+      order by cs.created_at, cs.id
+      limit 1
+    `, [cardId, sourceId ?? null]);
+    return result.rows[0] ?? null;
+  }
 }
 
 function baseCard(row: any) {
@@ -173,6 +188,7 @@ function toCard(row: any) {
 
 function toSource(row: any) {
   return {
+    sourceId: row.source_id,
     documentId: row.document_id,
     filename: row.filename,
     sourcePath: row.source_path,

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import JSZip from 'jszip';
 import { DebateCard, DebateDocument } from '../types';
 import { escapeHtml, stripTagsToText, decodeXmlEntities } from '../utils/docxProcessor';
+import { downloadCardDocx } from '../api/cards';
 
 declare global {
   interface Window {
@@ -355,7 +356,14 @@ const CardPreview: React.FC<CardPreviewProps> = ({ card, docs, onStepSelection, 
     if (!card) return;
     const doc = docs.get(card.docId);
     if (!doc) return;
-    if (doc.remote) { showToast('DOCX download will be available after archive storage is connected'); return; }
+    if (doc.remote) {
+      try {
+        showToast('Preparing DOCX...');
+        const download = await downloadCardDocx(card.id, card.sourceId);
+        downloadFile(download.blob, download.filename);
+      } catch (error) { showToast(error instanceof Error ? error.message : 'DOCX download failed'); }
+      return;
+    }
     const blob = currentBlobRef.current || await buildCardDocx(card, doc);
     downloadFile(blob, safeFilename(card, doc));
   };
@@ -365,7 +373,7 @@ const CardPreview: React.FC<CardPreviewProps> = ({ card, docs, onStepSelection, 
       <div className="preview-toolbar" style={{ display: card ? '' : 'none' }}>
         <button className="primary" onClick={handleCopyFormatted}>Copy formatted</button>
         <button onClick={handleCopyPlain}>Copy plain text</button>
-        <button onClick={handleDownload} disabled={!!(card && docs.get(card.docId)?.remote)} title={card && docs.get(card.docId)?.remote ? 'Archive storage is not connected yet' : ''}>Download .docx</button>
+        <button onClick={handleDownload}>Download .docx</button>
         <span className="spacer"></span>
         <button onClick={() => onStepSelection(-1)}>← Prev</button>
         <button onClick={() => onStepSelection(1)}>Next →</button>
