@@ -30,6 +30,10 @@ createServer(async (request, response) => {
     try { return json(response, 200, await searchRepository.filters()); }
     catch (error) { return apiError(response, error); }
   }
+  if (request.method === 'GET' && url.pathname === '/api/admin/me') {
+    try { const admin = await requireAdmin(request); return json(response, 200, { isAdmin: true, email: admin.email }); }
+    catch (error) { return apiError(response, error); }
+  }
   if (request.method === 'POST' && url.pathname === '/api/admin/uploads/presign') {
     try {
       const admin = await requireAdmin(request);

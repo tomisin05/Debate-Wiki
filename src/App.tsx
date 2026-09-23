@@ -12,7 +12,7 @@ import { AppState, DebateCard } from './types';
 import { processDocxFile, parseCardsFromDoc } from './utils/docxProcessor';
 import { expandUploadFiles } from './utils/archiveProcessor';
 import { SearchEngine } from './utils/searchEngine';
-import { getCard, getFilters, materializeCard, searchCards, uploadArchive, type FilterResponse } from './api/cards';
+import { getAdminStatus, getCard, getFilters, materializeCard, searchCards, uploadArchive, type FilterResponse } from './api/cards';
 import './App.css';
 
 const searchEngine = new SearchEngine();
@@ -104,6 +104,7 @@ function AppContent() {
   const [searchStatus, setSearchStatus] = useState({ loading: true, error: '', total: 0, totalPages: 1 });
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const showToast = useCallback((message: string) => {
     setToast({ show: true, message });
@@ -122,6 +123,13 @@ function AppContent() {
     });
     return () => controller.abort();
   }, [refreshKey]);
+
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    let active = true;
+    getAdminStatus().then(value => { if (active) setIsAdmin(value); }).catch(() => { if (active) setIsAdmin(false); });
+    return () => { active = false; };
+  }, [user]);
 
   useEffect(() => {
     if (mode !== 'database') return;
@@ -315,6 +323,7 @@ function AppContent() {
         mode={mode}
         libraryStats={mode === 'database' ? { documents: filters?.documents ?? 0, cards: filters?.cards ?? 0, shown: searchStatus.total } : undefined}
         onReturnLibrary={returnToLibrary}
+        isAdmin={isAdmin}
       />
       <SearchRow state={state} setState={setState} searchInputRef={searchInputRef} mode={mode} filters={filters} />
       <YearFilterRow state={state} setState={setState} mode={mode} />

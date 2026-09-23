@@ -46,6 +46,13 @@ export async function searchCards(params: URLSearchParams, signal?: AbortSignal)
 }
 export async function getCard(id: string, signal?: AbortSignal): Promise<ApiCard> { return request(`/api/cards/${id}`, signal); }
 export async function getFilters(signal?: AbortSignal): Promise<FilterResponse> { return request('/api/filters', signal); }
+export async function getAdminStatus() {
+  const token = await adminToken();
+  const response = await fetch(`${API_URL}/api/admin/me`, { headers: { authorization: `Bearer ${token}` } });
+  if (response.status === 401 || response.status === 403 || response.status === 404) return false;
+  if (!response.ok) throw new Error(`Admin check returned ${response.status}.`);
+  return true;
+}
 export async function downloadCardDocx(cardId: string, sourceId?: string) {
   const params = sourceId ? `?sourceId=${encodeURIComponent(sourceId)}` : '';
   const response = await fetch(`${API_URL}/api/cards/${cardId}/download${params}`);
