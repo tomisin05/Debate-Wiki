@@ -47,7 +47,7 @@ export async function searchCards(params: URLSearchParams, signal?: AbortSignal)
 export async function getCard(id: string, signal?: AbortSignal): Promise<ApiCard> { return request(`/api/cards/${id}`, signal); }
 export async function getFilters(signal?: AbortSignal): Promise<FilterResponse> { return request('/api/filters', signal); }
 export async function getAdminStatus() {
-  const token = await adminToken();
+  const token = await adminToken(true);
   const response = await fetch(`${API_URL}/api/admin/me`, { headers: { authorization: `Bearer ${token}` } });
   if (response.status === 401 || response.status === 403 || response.status === 404) return false;
   if (!response.ok) throw new Error(`Admin check returned ${response.status}.`);
@@ -72,10 +72,10 @@ export async function uploadArchive(file: File, onProgress: (percent: number, la
   });
   await putFile(prepared.uploadUrl, file, percent => onProgress(percent * 0.8, `Uploading ${file.name}: ${Math.round(percent)}%`));
   onProgress(82, `Starting ingestion for ${file.name}...`);
-  await adminRequest(`/api/admin/uploads/${prepared.jobId}/complete`, token, { method: 'POST' });
+  await adminRequest(`/api/admin/uploads/${prepared.jobId}/complete`, await adminToken(true), { method: 'POST' });
 
   for (;;) {
-    const job = await adminRequest<IngestionJob>(`/api/admin/jobs/${prepared.jobId}`, token);
+    const job = await adminRequest<IngestionJob>(`/api/admin/jobs/${prepared.jobId}`, await adminToken());
     const ingestionPercent = job.totalDocuments ? job.processedDocuments / job.totalDocuments : 0;
     onProgress(82 + ingestionPercent * 18, `${job.status}: ${job.processedDocuments} of ${job.totalDocuments || '?'} documents`);
     if (['completed', 'completed_with_warnings'].includes(job.status)) return job;
@@ -93,10 +93,10 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   return response.json();
 }
 
-async function adminToken() {
+async function adminToken(forceRefresh = false) {
   const user = auth.currentUser;
   if (!user) throw new Error('Sign in before uploading tournament archives.');
-  return user.getIdToken();
+  return user.getIdToken(forceRefresh);
 }
 
 async function adminRequest<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {

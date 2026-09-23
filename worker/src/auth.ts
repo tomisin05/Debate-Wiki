@@ -20,7 +20,10 @@ export async function requireAdmin(request: IncomingMessage): Promise<AdminIdent
   if (!header?.startsWith('Bearer ')) throw new AuthError(401, 'Authentication is required.');
   let token;
   try { token = await getAuth(firebaseApp()).verifyIdToken(header.slice(7)); }
-  catch { throw new AuthError(401, 'The authentication token is invalid or expired.'); }
+  catch (error) {
+    console.error('Firebase ID token verification failed:', error instanceof Error ? error.message : error);
+    throw new AuthError(401, 'The authentication token is invalid or expired.');
+  }
 
   const email = token.email?.toLowerCase();
   const allowedEmails = new Set((process.env.ADMIN_EMAILS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean));
