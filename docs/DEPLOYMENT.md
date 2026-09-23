@@ -60,14 +60,14 @@ If the repository already exists, skip its creation command.
 
 In Google Cloud Console, open **Security → Secret Manager** and create these secrets. Copy the values from the local `.env`; never commit them.
 
-| Secret name | Local variable |
-| --- | --- |
-| `debate-database-url` | `DATABASE_URL` |
-| `debate-r2-account-id` | `R2_ACCOUNT_ID` |
-| `debate-r2-access-key-id` | `R2_ACCESS_KEY_ID` |
+| Secret name                   | Local variable         |
+| ----------------------------- | ---------------------- |
+| `debate-database-url`         | `DATABASE_URL`         |
+| `debate-r2-account-id`        | `R2_ACCOUNT_ID`        |
+| `debate-r2-access-key-id`     | `R2_ACCESS_KEY_ID`     |
 | `debate-r2-secret-access-key` | `R2_SECRET_ACCESS_KEY` |
-| `debate-r2-bucket` | `R2_BUCKET` |
-| `debate-admin-emails` | `ADMIN_EMAILS` |
+| `debate-r2-bucket`            | `R2_BUCKET`            |
+| `debate-admin-emails`         | `ADMIN_EMAILS`         |
 
 Create service identities:
 
@@ -199,7 +199,7 @@ The health and search requests should return `200`. The public API's `/ingest` r
 In Vercel, open **Project → Settings → Environment Variables** and add:
 
 ```text
-VITE_API_URL = the API_URL printed above
+API_URL = the API_URL printed above
 ```
 
 Add it to Production and Preview as appropriate, then redeploy. Vite reads this value at build time, so changing it does not affect an existing deployment.

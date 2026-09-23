@@ -2,7 +2,7 @@ import { DebateCard, DebateDocument } from '../types';
 import { escapeHtml, normKey } from '../utils/docxProcessor';
 import { auth } from '../firebase';
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+const API_URL = (import.meta.env.API_URL || 'http://localhost:8080').replace(/\/$/, '');
 
 export interface ApiSource {
   documentId: string;
