@@ -63,7 +63,17 @@ function safeFilename(card: DebateCard, doc: DebateDocument): string {
 
 function openCaselistUrl(doc: DebateDocument): string | null {
   if (!doc.sourcePath) return null;
-  const path = doc.sourcePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  const sourcePath = doc.sourcePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  if (!sourcePath) return null;
+
+  // Individually uploaded documents retain only their filename as sourcePath.
+  // Rebuild the OpenCaselist path from the separately stored folder metadata.
+  const path = sourcePath.includes('/')
+    ? sourcePath
+    : [doc.collection, doc.school, doc.teamName, sourcePath]
+        .map(part => part?.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''))
+        .filter(Boolean)
+        .join('/');
   return `https://api.opencaselist.com/v1/download?path=${encodeURIComponent(path)}`;
 }
 
