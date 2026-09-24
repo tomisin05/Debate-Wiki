@@ -130,7 +130,6 @@ const CardList: React.FC<CardListProps> = ({
   return (
     <div className="left-pane" ref={paneRef}>
       <div className="pane-header">
-        <span>{cards.length} of {total ?? cards.length} cards{loading ? ' · updating...' : ''}</span>
         <div className="right">
           <button className="btn-link">Download all as ZIP</button>
         </div>
