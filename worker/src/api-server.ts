@@ -4,7 +4,7 @@ import { buildStoredCardDocx } from './download.js';
 import { SearchRepository, type SearchSort } from './search.js';
 
 const port = Number(process.env.PORT || 8080);
-const repository = new SearchRepository();
+let repository: SearchRepository | undefined;
 
 const server = createServer(async (request, response) => {
   setCors(request, response);
@@ -14,19 +14,19 @@ const server = createServer(async (request, response) => {
   if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { ok: true });
 
   if (request.method === 'GET' && url.pathname === '/api/cards') {
-    try { return json(response, 200, await repository.search(searchInput(url.searchParams))); }
+    try { return json(response, 200, await searchRepository().search(searchInput(url.searchParams))); }
     catch (error) { return apiError(response, error); }
   }
 
   if (request.method === 'GET' && url.pathname === '/api/filters') {
-    try { return json(response, 200, await repository.filters()); }
+    try { return json(response, 200, await searchRepository().filters()); }
     catch (error) { return apiError(response, error); }
   }
 
   const cardMatch = request.method === 'GET' && url.pathname.match(/^\/api\/cards\/([0-9a-f-]{36})$/i);
   if (cardMatch) {
     try {
-      const card = await repository.getCard(cardMatch[1]);
+      const card = await searchRepository().getCard(cardMatch[1]);
       return card ? json(response, 200, card) : json(response, 404, { error: 'Card not found' });
     } catch (error) { return apiError(response, error); }
   }
@@ -36,7 +36,7 @@ const server = createServer(async (request, response) => {
     try {
       const sourceId = url.searchParams.get('sourceId') || undefined;
       if (sourceId && !/^[0-9a-f-]{36}$/i.test(sourceId)) throw new HttpError(400, 'Invalid sourceId.');
-      const source = await repository.getDownloadSource(downloadMatch[1], sourceId);
+      const source = await searchRepository().getDownloadSource(downloadMatch[1], sourceId);
       if (!source) return json(response, 404, { error: 'Card source not found' });
       const file = await buildStoredCardDocx(source);
       response.writeHead(200, {
@@ -57,6 +57,11 @@ server.on('error', error => {
   process.exitCode = 1;
 });
 server.listen(port, '0.0.0.0', () => console.log(`Public card API listening on ${port}`));
+
+function searchRepository() {
+  repository ??= new SearchRepository();
+  return repository;
+}
 
 function searchInput(params: URLSearchParams) {
   const page = integer(params.get('page'), 1, 1, 100000);
