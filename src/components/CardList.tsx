@@ -129,12 +129,6 @@ const CardList: React.FC<CardListProps> = ({
 
   return (
     <div className="left-pane" ref={paneRef}>
-      <div className="pane-header">
-        <div className="right">
-          <button className="btn-link">Download all as ZIP</button>
-        </div>
-      </div>
-      
       <div>
         {hasPrevious && <div ref={loadPreviousRef} className="infinite-scroll-status">
           {loading ? <><div className="spinner"></div>Loading earlier cards...</> : 'Scroll up for earlier cards'}
