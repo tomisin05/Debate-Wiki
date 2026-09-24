@@ -3,7 +3,7 @@ import { escapeHtml, normKey } from '../utils/docxProcessor';
 import { auth } from '../firebase';
 
 const LOCAL_API_URL = (import.meta.env.VITE_LOCAL_API_URL || 'http://localhost:8081').replace(/\/$/, '');
-const API_URL = (import.meta.env.DEV ? LOCAL_API_URL : (import.meta.env.VITE_API_URL || 'http://localhost:8080')).replace(/\/$/, '');
+const API_URL = import.meta.env.DEV ? LOCAL_API_URL : '';
 const ADMIN_API_URL = (import.meta.env.DEV ? (import.meta.env.VITE_ADMIN_API_URL || LOCAL_API_URL) : API_URL).replace(/\/$/, '');
 
 export interface ApiSource {

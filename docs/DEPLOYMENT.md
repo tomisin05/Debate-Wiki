@@ -1,4 +1,6 @@
-# Deploy the public search API
+# Legacy Google Cloud deployment
+
+The active deployment approach is now Vercel Functions. See [VERCEL_API.md](./VERCEL_API.md). The instructions below are retained only while the old Cloud Run resources are being removed.
 
 Only the search and download API runs in Cloud Run. Archive ingestion runs locally; no Cloud Run worker or Pub/Sub subscription is required.
 

@@ -23,7 +23,7 @@ export class SearchRepository {
     if (!connectionString) throw new Error('DATABASE_URL is required.');
     this.pool = new Pool({
       connectionString,
-      max: Number(process.env.SEARCH_DB_POOL_SIZE || 10),
+      max: Number(process.env.SEARCH_DB_POOL_SIZE || (process.env.VERCEL ? 1 : 10)),
       ssl: { rejectUnauthorized: false },
       statement_timeout: 5000,
       query_timeout: 6000,

@@ -23,6 +23,7 @@
     "worker:build": "tsc -p tsconfig.worker.json",
     "worker:start": "node dist-worker/worker/src/server.js",
     "api:start": "node dist-worker/worker/src/api-server.js",
+    "api:check": "tsc -p tsconfig.vercel.json",
     "ingest:server": "npm run worker:build && node dist-worker/worker/src/local-server.js",
     "ingest": "tsx worker/src/cli.ts",
     "ingest:dry": "tsx worker/src/cli.ts --dry-run",
