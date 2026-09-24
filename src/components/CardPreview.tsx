@@ -65,19 +65,28 @@ function openCaselistUrl(doc: DebateDocument): string | null {
   if (!doc.sourcePath) return null;
   const sourcePath = doc.sourcePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
   if (!sourcePath) return null;
+  const defaultCollection = import.meta.env.VITE_OPENCASELIST_COLLECTION || 'ndtceda26';
 
   // Individually uploaded documents retain only their filename as sourcePath.
   // Rebuild the OpenCaselist path from the separately stored folder metadata.
   let path = sourcePath;
   if (!sourcePath.includes('/')) {
     const filenameParts = sourcePath.split('-');
-    const collection = doc.collection || import.meta.env.VITE_OPENCASELIST_COLLECTION || 'ndtceda26';
+    const collection = doc.collection || defaultCollection;
     const school = doc.school || filenameParts[0];
     const teamName = doc.teamName || filenameParts[1];
     path = [collection, school, teamName, sourcePath]
       .map(part => part?.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''))
       .filter(Boolean)
       .join('/');
+  } else {
+    // Weekly ZIPs may wrap the caselist in a dated directory. OpenCaselist paths
+    // begin at the caselist directory, so discard that archive-only prefix.
+    const parts = sourcePath.split('/').filter(Boolean);
+    const collectionIndex = parts.findIndex(part =>
+      part === defaultCollection || /^ndtceda\d+$/i.test(part),
+    );
+    if (collectionIndex > 0) path = parts.slice(collectionIndex).join('/');
   }
   return `https://api.opencaselist.com/v1/download?path=${encodeURIComponent(path)}`;
 }
