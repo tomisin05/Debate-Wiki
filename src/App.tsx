@@ -26,9 +26,6 @@ const initialState: AppState = {
   searchScope: 'all',
   docFilter: '',
   sectionFilter: '',
-  collectionFilter: '',
-  schoolFilter: '',
-  teamFilter: '',
   authorFilter: '',
   sortOrder: 'newest',
   yearMin: '',
@@ -134,7 +131,7 @@ function AppContent() {
   useEffect(() => {
     if (mode !== 'database') return;
     setPage(1);
-  }, [mode, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.collectionFilter, state.schoolFilter, state.teamFilter, state.authorFilter, state.sortOrder]);
+  }, [mode, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.sortOrder]);
 
   useEffect(() => {
     if (mode !== 'database') return;
@@ -143,9 +140,6 @@ function AppContent() {
     if (debouncedSearch) params.set('q', debouncedSearch);
     if (state.yearMin) params.set('yearMin', state.yearMin);
     if (state.yearMax) params.set('yearMax', state.yearMax);
-    if (state.collectionFilter) params.set('collection', state.collectionFilter);
-    if (state.schoolFilter) params.set('school', state.schoolFilter);
-    if (state.teamFilter) params.set('teamName', state.teamFilter);
     if (state.authorFilter) params.set('author', state.authorFilter);
     const apiSort = ['relevance', 'year-new', 'year-old', 'newest'].includes(state.sortOrder) ? state.sortOrder : 'newest';
     params.set('sort', apiSort);
@@ -166,7 +160,7 @@ function AppContent() {
       if (error.name !== 'AbortError') setSearchStatus(previous => ({ ...previous, loading: false, error: error.message }));
     });
     return () => controller.abort();
-  }, [mode, page, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.collectionFilter, state.schoolFilter, state.teamFilter, state.authorFilter, state.sortOrder, refreshKey]);
+  }, [mode, page, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.sortOrder, refreshKey]);
 
   // Recompute filtered whenever relevant state changes
   useEffect(() => {
@@ -325,7 +319,7 @@ function AppContent() {
         onReturnLibrary={returnToLibrary}
         isAdmin={import.meta.env.DEV && isAdmin}
       />
-      <SearchRow state={state} setState={setState} searchInputRef={searchInputRef} mode={mode} filters={filters} />
+      <SearchRow state={state} setState={setState} searchInputRef={searchInputRef} mode={mode} />
       <YearFilterRow state={state} setState={setState} mode={mode} />
       <SplitPane
         state={state}

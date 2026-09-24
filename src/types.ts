@@ -52,9 +52,6 @@ export interface AppState {
   searchScope: 'all' | 'tag' | 'cite' | 'body';
   docFilter: string;
   sectionFilter: string;
-  collectionFilter: string;
-  schoolFilter: string;
-  teamFilter: string;
   authorFilter: string;
   sortOrder: 'doc' | 'alpha' | 'year-new' | 'year-old' | 'taglen' | 'relevance' | 'newest';
   yearMin: string;

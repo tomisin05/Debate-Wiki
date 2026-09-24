@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import type { FilterResponse } from '../api/cards';
 import { AppState } from '../types';
 
 interface SearchRowProps {
@@ -7,10 +6,9 @@ interface SearchRowProps {
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   searchInputRef?: React.RefObject<HTMLInputElement>;
   mode?: 'database' | 'local';
-  filters?: FilterResponse | null;
 }
 
-const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef, mode = 'local', filters }) => {
+const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef, mode = 'local' }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const documents = Array.from(state.docs.values());
   const sections = [...new Set(state.cards.map(card => card.section).filter(Boolean))].sort();
@@ -43,18 +41,6 @@ const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef, 
     </div>
 
     {mode === 'database' ? <>
-      <select value={state.collectionFilter} onChange={event => setState(previous => ({ ...previous, collectionFilter: event.target.value }))}>
-        <option value="">All collections</option>
-        {filters?.collections.map(value => <option key={value} value={value}>{value}</option>)}
-      </select>
-      <select value={state.schoolFilter} onChange={event => setState(previous => ({ ...previous, schoolFilter: event.target.value }))}>
-        <option value="">All schools</option>
-        {filters?.schools.map(value => <option key={value} value={value}>{value}</option>)}
-      </select>
-      <select value={state.teamFilter} onChange={event => setState(previous => ({ ...previous, teamFilter: event.target.value }))}>
-        <option value="">All teams</option>
-        {filters?.teams.map(value => <option key={value} value={value}>{value}</option>)}
-      </select>
       <input className="author-filter" value={state.authorFilter}
         onChange={event => setState(previous => ({ ...previous, authorFilter: event.target.value }))} placeholder="Author" />
     </> : <>
