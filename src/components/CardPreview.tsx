@@ -68,12 +68,17 @@ function openCaselistUrl(doc: DebateDocument): string | null {
 
   // Individually uploaded documents retain only their filename as sourcePath.
   // Rebuild the OpenCaselist path from the separately stored folder metadata.
-  const path = sourcePath.includes('/')
-    ? sourcePath
-    : [doc.collection, doc.school, doc.teamName, sourcePath]
-        .map(part => part?.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''))
-        .filter(Boolean)
-        .join('/');
+  let path = sourcePath;
+  if (!sourcePath.includes('/')) {
+    const filenameParts = sourcePath.split('-');
+    const collection = doc.collection || import.meta.env.VITE_OPENCASELIST_COLLECTION || 'ndtceda26';
+    const school = doc.school || filenameParts[0];
+    const teamName = doc.teamName || filenameParts[1];
+    path = [collection, school, teamName, sourcePath]
+      .map(part => part?.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''))
+      .filter(Boolean)
+      .join('/');
+  }
   return `https://api.opencaselist.com/v1/download?path=${encodeURIComponent(path)}`;
 }
 
