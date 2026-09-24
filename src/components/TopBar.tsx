@@ -10,12 +10,11 @@ interface TopBarProps {
   dupCount: number;
   onOpenMerge: () => void;
   mode?: 'database' | 'local';
-  libraryStats?: { documents: number; cards: number; shown: number };
   onReturnLibrary?: () => void;
   isAdmin?: boolean;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ state, setState, onIngestFiles, showToast, dupCount, onOpenMerge, mode = 'local', libraryStats, onReturnLibrary, isAdmin = false }) => {
+const TopBar: React.FC<TopBarProps> = ({ state, setState, onIngestFiles, showToast, dupCount, onOpenMerge, mode = 'local', onReturnLibrary, isAdmin = false }) => {
   const { user, logout } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,12 +51,9 @@ const TopBar: React.FC<TopBarProps> = ({ state, setState, onIngestFiles, showToa
 
       {isAdmin && <input ref={fileInputRef} type="file" className="file-input" accept=".docx,.zip" multiple onChange={handleFileChange} />}
 
-      <div className="stats-inline">
-        <span className="stat-pill"><b>{libraryStats?.documents ?? state.docs.size}</b>documents</span>
-        <span className="stat-pill"><b>{libraryStats?.cards ?? state.cards.length}</b>cards</span>
-        {mode === 'local' && <span className="stat-pill"><b>{dupCount}</b>duplicates hidden</span>}
-        <span className="stat-pill"><b>{libraryStats?.shown ?? state.filtered.length}</b>shown</span>
-      </div>
+      {mode === 'local' && <div className="stats-inline">
+        <span className="stat-pill"><b>{dupCount}</b>duplicates hidden</span>
+      </div>}
 
       <div className="user-menu">
         {user?.photoURL && <img src={user.photoURL} alt="User avatar" className="user-avatar" />}

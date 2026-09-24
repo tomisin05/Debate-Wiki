@@ -12,7 +12,7 @@ import { AppState, DebateCard } from './types';
 import { processDocxFile, parseCardsFromDoc } from './utils/docxProcessor';
 import { expandUploadFiles } from './utils/archiveProcessor';
 import { SearchEngine } from './utils/searchEngine';
-import { getAdminStatus, getCard, getFilters, materializeCard, searchCards, uploadArchive, type FilterResponse } from './api/cards';
+import { getAdminStatus, getCard, materializeCard, searchCards, uploadArchive } from './api/cards';
 import './App.css';
 
 const searchEngine = new SearchEngine();
@@ -96,7 +96,6 @@ function AppContent() {
   const [showMerge, setShowMerge] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<'database' | 'local'>('database');
-  const [filters, setFilters] = useState<FilterResponse | null>(null);
   const [page, setPage] = useState(1);
   const [searchStatus, setSearchStatus] = useState({ loading: true, error: '', total: 0, totalPages: 1 });
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -112,14 +111,6 @@ function AppContent() {
     const timer = window.setTimeout(() => setDebouncedSearch(state.search), 300);
     return () => window.clearTimeout(timer);
   }, [state.search]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    getFilters(controller.signal).then(setFilters).catch(error => {
-      if (error.name !== 'AbortError') setSearchStatus(previous => ({ ...previous, error: error.message }));
-    });
-    return () => controller.abort();
-  }, [refreshKey]);
 
   useEffect(() => {
     if (!import.meta.env.DEV || !user) { setIsAdmin(false); return; }
@@ -315,7 +306,6 @@ function AppContent() {
         dupCount={dupCount}
         onOpenMerge={() => setShowMerge(true)}
         mode={mode}
-        libraryStats={mode === 'database' ? { documents: filters?.documents ?? 0, cards: filters?.cards ?? 0, shown: searchStatus.total } : undefined}
         onReturnLibrary={returnToLibrary}
         isAdmin={import.meta.env.DEV && isAdmin}
       />

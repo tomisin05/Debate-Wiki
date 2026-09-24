@@ -36,7 +36,6 @@ export interface ApiCard {
 }
 
 export interface SearchResponse { items: ApiCard[]; page: number; limit: number; total: number; totalPages: number }
-export interface FilterResponse { collections: string[]; schools: string[]; teams: string[]; documents: number; cards: number }
 export interface IngestionJob {
   id: string; archiveName: string; status: 'queued' | 'processing' | 'completed' | 'completed_with_warnings' | 'failed';
   totalDocuments: number; processedDocuments: number; uniqueCards: number; duplicateCards: number;
@@ -47,7 +46,6 @@ export async function searchCards(params: URLSearchParams, signal?: AbortSignal)
   return request(`/api/cards?${params}`, signal);
 }
 export async function getCard(id: string, signal?: AbortSignal): Promise<ApiCard> { return request(`/api/cards/${id}`, signal); }
-export async function getFilters(signal?: AbortSignal): Promise<FilterResponse> { return request('/api/filters', signal); }
 export async function getAdminStatus() {
   const token = await adminToken(true);
   const response = await fetch(`${ADMIN_API_URL}/api/admin/me`, { headers: { authorization: `Bearer ${token}` } });
