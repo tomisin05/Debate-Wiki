@@ -125,7 +125,7 @@ function AppContent() {
   }, [refreshKey]);
 
   useEffect(() => {
-    if (!user) { setIsAdmin(false); return; }
+    if (!import.meta.env.DEV || !user) { setIsAdmin(false); return; }
     let active = true;
     getAdminStatus().then(value => { if (active) setIsAdmin(value); }).catch(() => { if (active) setIsAdmin(false); });
     return () => { active = false; };
@@ -323,7 +323,7 @@ function AppContent() {
         mode={mode}
         libraryStats={mode === 'database' ? { documents: filters?.documents ?? 0, cards: filters?.cards ?? 0, shown: searchStatus.total } : undefined}
         onReturnLibrary={returnToLibrary}
-        isAdmin={isAdmin}
+        isAdmin={import.meta.env.DEV && isAdmin}
       />
       <SearchRow state={state} setState={setState} searchInputRef={searchInputRef} mode={mode} filters={filters} />
       <YearFilterRow state={state} setState={setState} mode={mode} />

@@ -1,53 +1,61 @@
-# Persistent administrator uploads
+# Local administrator ingestion
 
-The browser uploads archives directly to Cloudflare R2 with a 15 minute signed URL. The API never receives the archive bytes. After upload, the API queues the existing ingestion worker and the browser polls `ingestion_jobs` for progress.
+Tournament archives are processed on the administrator's computer. The local ingestion service uploads the original ZIP or DOCX to Cloudflare R2, parses it locally, removes duplicate cards, and writes the results directly to Supabase PostgreSQL. The deployed Cloud Run API is used only for public search, previews, and downloads.
 
-## Required configuration
+## Local configuration
 
-Add these values to `.env` for local development and to the deployed service's secret configuration:
+Set these values in the root `.env` file:
 
 ```env
-R2_ACCOUNT_ID=
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
+VITE_API_URL=https://YOUR-API.a.run.app
+VITE_LOCAL_API_URL=http://localhost:8081
+VITE_ADMIN_API_URL=http://localhost:8081
+DATABASE_URL=postgresql://...
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
 R2_BUCKET=debate-archives
-ADMIN_EMAILS=admin@example.com
 FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_SERVICE_ACCOUNT_JSON={...}
+ADMIN_EMAILS=admin@example.com
+CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173
+ADMIN_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-`ADMIN_EMAILS` accepts a comma-separated list. A Firebase user is also accepted when its ID token has the custom claim `admin: true`.
+`FIREBASE_SERVICE_ACCOUNT_JSON` must contain a Firebase service account JSON object on one line. It lets the local service verify the Firebase login token. `ADMIN_EMAILS` is a comma-separated list.
 
-Apply [worker/r2-cors.json](../worker/r2-cors.json) to the R2 bucket after replacing `YOUR-WEB-APP-DOMAIN`. The bucket must allow `PUT` from the web application origin.
+Do not set `PUBSUB_TOPIC` or `WORKER_INGEST_URL` locally. The `local` service role ignores both values, but leaving them blank makes the intended setup clear.
 
-R2 object read/write credentials can generate signed URLs but may not have permission to change bucket CORS. Apply the policy in the Cloudflare dashboard under **R2 → bucket → Settings → CORS Policy**, or use a Cloudflare token with bucket administration permission.
+## Start the local upload system
 
-## Production queue
+Open two terminals in the repository.
 
-For production, set:
+Terminal 1:
 
-```env
-PUBSUB_TOPIC=debate-ingestion
-SERVICE_ROLE=api
+```bash
+npm run ingest:server
 ```
 
-Create a push subscription from that topic to the worker's `/ingest` endpoint and use a service account with Cloud Run invoker permission. Cloud Run verifies the subscription's OIDC token. Leave `WORKER_SHARED_SECRET` empty in this configuration.
+Terminal 2:
 
-Deploy the worker from the same image with `SERVICE_ROLE=worker`, no public access, and no `PUBSUB_TOPIC`. The role switch prevents the public API service from exposing `/ingest`.
-
-For a separate worker without Pub/Sub, configure:
-
-```env
-WORKER_INGEST_URL=https://worker.example.com/ingest
-WORKER_SHARED_SECRET=a-long-random-secret
+```bash
+npm run dev
 ```
 
-When neither option is present, local development processes the archive synchronously in the API service.
+Open `http://localhost:5173`, sign in using an address in `ADMIN_EMAILS`, and use **Add documents or ZIP**. Keep Terminal 1 open until processing completes.
 
-## API routes
+The local browser sends admin requests to port `8081`. Public searches still use `VITE_API_URL`. When ingestion finishes, the cards are already in Supabase and become visible on the deployed website after refresh.
 
-- `POST /api/admin/uploads/presign` creates the ingestion job and signed R2 upload URL.
-- `POST /api/admin/uploads/{jobId}/complete` dispatches ingestion after the upload succeeds.
-- `GET /api/admin/jobs/{jobId}` returns live progress and final totals.
-- `GET /api/admin/jobs` returns recent ingestion jobs.
+## Command line ingestion
 
-All `/api/admin/*` routes require a Firebase ID token and administrator access.
+The browser and R2 step can be skipped when desired:
+
+```bash
+npm run ingest -- "C:\\path\\to\\tournament.zip"
+```
+
+This parses the local file and writes directly to Supabase. Use `npm run ingest:dry -- "C:\\path\\to\\tournament.zip"` to validate without saving cards.
+
+## R2 CORS
+
+The R2 bucket must allow `PUT` from `http://localhost:5173`. The provided [r2-cors.json](../worker/r2-cors.json) contains that origin.

@@ -17,11 +17,13 @@ const searchRepository = new SearchRepository();
 const uploadRepository = new UploadRepository();
 
 createServer(async (request, response) => {
-  setCors(response);
+  setCors(request, response);
   if (request.method === 'OPTIONS') return json(response, 204, null);
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
   if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { ok: true });
   if (serviceRole === 'worker' && !(request.method === 'POST' && url.pathname === '/ingest')) return json(response, 404, { error: 'Not found' });
+  if (url.pathname.startsWith('/api/admin/') && serviceRole !== 'local') return json(response, 404, { error: 'Not found' });
+  if (url.pathname.startsWith('/api/admin/') && !adminOriginAllowed(request)) return json(response, 403, { error: 'Administrator tools are restricted to localhost.' });
   if (request.method === 'GET' && url.pathname === '/api/cards') {
     try { return json(response, 200, await searchRepository.search(searchInput(url.searchParams))); }
     catch (error) { return apiError(response, error); }
@@ -53,7 +55,17 @@ createServer(async (request, response) => {
       const job = await uploadRepository.getJob(jobId);
       if (!job) throw new HttpError(404, 'Ingestion job not found.');
       if (job.status !== 'queued') throw new HttpError(409, `Job is already ${job.status}.`);
-      await dispatchIngestion({ jobId, storageKey: job.storageKey, archiveName: job.archiveName });
+      const message = { jobId, storageKey: job.storageKey, archiveName: job.archiveName };
+      if (serviceRole === 'local') {
+        void dispatchIngestion(message).catch(async error => {
+          const repository = new CardRepository();
+          try { await repository.failJob(jobId, error); }
+          finally { await repository.close(); }
+          console.error('Local ingestion failed:', error);
+        });
+      } else {
+        await dispatchIngestion(message);
+      }
       return json(response, 202, { jobId, status: 'processing' });
     } catch (error) { return apiError(response, error); }
   }
@@ -159,6 +171,14 @@ function validArchiveName(value: unknown) {
 }
 function safeObjectName(value: string) { return value.replace(/[^a-zA-Z0-9._-]/g, '_'); }
 async function dispatchIngestion(message: JobMessage) {
+  if (serviceRole === 'local') {
+    const repository = new CardRepository();
+    try {
+      const bytes = await new R2Storage().download(message.storageKey);
+      await ingest(bytes, message.archiveName, { repository, storageKey: message.storageKey, jobId: message.jobId });
+    } finally { await repository.close(); }
+    return;
+  }
   if (process.env.PUBSUB_TOPIC) {
     await new PubSub().topic(process.env.PUBSUB_TOPIC).publishMessage({ json: message });
     return;
@@ -178,11 +198,21 @@ async function dispatchIngestion(message: JobMessage) {
     await ingest(bytes, message.archiveName, { repository, storageKey: message.storageKey, jobId: message.jobId });
   } finally { await repository.close(); }
 }
-function setCors(response: import('node:http').ServerResponse) {
-  response.setHeader('access-control-allow-origin', process.env.CORS_ORIGIN || 'http://localhost:5173');
+function configuredOrigins(name: string, fallback: string) {
+  return (process.env[name] || fallback).split(',').map(value => value.trim()).filter(Boolean);
+}
+function setCors(request: import('node:http').IncomingMessage, response: import('node:http').ServerResponse) {
+  const origin = request.headers.origin;
+  const allowed = configuredOrigins('CORS_ORIGIN', 'http://localhost:5173,http://127.0.0.1:5173');
+  if (origin && allowed.includes(origin)) response.setHeader('access-control-allow-origin', origin);
+  response.setHeader('vary', 'Origin');
   response.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
   response.setHeader('access-control-allow-headers', 'content-type,authorization');
   response.setHeader('access-control-expose-headers', 'content-disposition');
+}
+function adminOriginAllowed(request: import('node:http').IncomingMessage) {
+  const origin = request.headers.origin;
+  return !!origin && configuredOrigins('ADMIN_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').includes(origin);
 }
 
 function parseMessage(body: string): JobMessage {

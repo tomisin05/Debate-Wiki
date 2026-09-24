@@ -1,4 +1,4 @@
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import type { IncomingMessage } from 'node:http';
 
@@ -12,7 +12,7 @@ function firebaseApp() {
     return initializeApp({ credential: cert(credentials), projectId: credentials.project_id });
   }
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
-  return initializeApp({ projectId });
+  return initializeApp({ credential: applicationDefault(), projectId });
 }
 
 export async function requireAdmin(request: IncomingMessage): Promise<AdminIdentity> {

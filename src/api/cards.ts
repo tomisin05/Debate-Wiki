@@ -2,7 +2,9 @@ import { DebateCard, DebateDocument } from '../types';
 import { escapeHtml, normKey } from '../utils/docxProcessor';
 import { auth } from '../firebase';
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+const LOCAL_API_URL = (import.meta.env.VITE_LOCAL_API_URL || 'http://localhost:8081').replace(/\/$/, '');
+const API_URL = (import.meta.env.DEV ? LOCAL_API_URL : (import.meta.env.VITE_API_URL || 'http://localhost:8080')).replace(/\/$/, '');
+const ADMIN_API_URL = (import.meta.env.DEV ? (import.meta.env.VITE_ADMIN_API_URL || LOCAL_API_URL) : API_URL).replace(/\/$/, '');
 
 export interface ApiSource {
   sourceId: string;
@@ -48,7 +50,7 @@ export async function getCard(id: string, signal?: AbortSignal): Promise<ApiCard
 export async function getFilters(signal?: AbortSignal): Promise<FilterResponse> { return request('/api/filters', signal); }
 export async function getAdminStatus() {
   const token = await adminToken(true);
-  const response = await fetch(`${API_URL}/api/admin/me`, { headers: { authorization: `Bearer ${token}` } });
+  const response = await fetch(`${ADMIN_API_URL}/api/admin/me`, { headers: { authorization: `Bearer ${token}` } });
   if (response.status === 401 || response.status === 403 || response.status === 404) return false;
   if (!response.ok) throw new Error(`Admin check returned ${response.status}.`);
   return true;
@@ -100,7 +102,7 @@ async function adminToken(forceRefresh = false) {
 }
 
 async function adminRequest<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${ADMIN_API_URL}${path}`, {
     ...init,
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...init.headers },
   });
