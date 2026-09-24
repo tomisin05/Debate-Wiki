@@ -8,7 +8,7 @@ import SplitPane from './components/SplitPane';
 import ProgressOverlay from './components/ProgressOverlay';
 import Toast from './components/Toast';
 import MergePanel from './components/MergePanel';
-import { AppState, DebateCard } from './types';
+import { AppState, DebateCard, DebateDocument } from './types';
 import { processDocxFile, parseCardsFromDoc } from './utils/docxProcessor';
 import { expandUploadFiles } from './utils/archiveProcessor';
 import { SearchEngine } from './utils/searchEngine';
@@ -16,6 +16,12 @@ import { getAdminStatus, getCard, materializeCard, searchCards, uploadArchive } 
 import './App.css';
 
 const searchEngine = new SearchEngine();
+const MAX_CACHED_SEARCH_PAGES = 6;
+
+interface CachedSearchPage {
+  cards: DebateCard[];
+  docs: Map<string, DebateDocument>;
+}
 
 const initialState: AppState = {
   docs: new Map(),
@@ -97,6 +103,8 @@ function AppContent() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<'database' | 'local'>('database');
   const [page, setPage] = useState(1);
+  const [pageWindow, setPageWindow] = useState({ first: 1, last: 1 });
+  const pageCacheRef = useRef(new Map<number, CachedSearchPage>());
   const [searchStatus, setSearchStatus] = useState({ loading: true, error: '', total: 0, totalPages: 1 });
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -122,7 +130,7 @@ function AppContent() {
   useEffect(() => {
     if (mode !== 'database') return;
     setPage(1);
-  }, [mode, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.sortOrder]);
+  }, [mode, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.sortOrder, refreshKey]);
 
   useEffect(() => {
     if (mode !== 'database') return;
@@ -137,7 +145,7 @@ function AppContent() {
 
     setSearchStatus(previous => ({ ...previous, loading: true, error: '' }));
     searchCards(params, controller.signal).then(result => {
-      const docs = new Map();
+      const docs = new Map<string, DebateDocument>();
       const cards: DebateCard[] = [];
       for (const item of result.items) {
         const materialized = materializeCard(item);
@@ -145,13 +153,61 @@ function AppContent() {
         docs.set(materialized.doc.id, materialized.doc);
         cards.push(materialized.card);
       }
-      setState(previous => ({ ...previous, docs, cards, filtered: cards, selectedCardId: null, currentPreviewCard: null }));
+      const cache = pageCacheRef.current;
+      const previousPages = [...cache.keys()].sort((a, b) => a - b);
+      const loadingOlderPage = previousPages.length > 0 && page < previousPages[0];
+      if (page === 1) cache.clear();
+      cache.set(page, { cards, docs });
+
+      while (cache.size > MAX_CACHED_SEARCH_PAGES) {
+        const cachedPages = [...cache.keys()].sort((a, b) => a - b);
+        cache.delete(loadingOlderPage ? cachedPages[cachedPages.length - 1] : cachedPages[0]);
+      }
+
+      const cachedPages = [...cache.keys()].sort((a, b) => a - b);
+      const combinedDocs = new Map<string, DebateDocument>();
+      const combinedCards: DebateCard[] = [];
+      const existingIds = new Set<string>();
+      for (const cachedPage of cachedPages) {
+        const entry = cache.get(cachedPage)!;
+        entry.docs.forEach((doc, id) => combinedDocs.set(id, doc));
+        for (const card of entry.cards) {
+          if (!existingIds.has(card.id)) {
+            existingIds.add(card.id);
+            combinedCards.push(card);
+          }
+        }
+      }
+      setPageWindow({ first: cachedPages[0], last: cachedPages[cachedPages.length - 1] });
+      setState(previous => {
+        const selectedCard = page === 1 ? null : previous.currentPreviewCard;
+        const selectedDoc = selectedCard ? previous.docs.get(selectedCard.docId) : undefined;
+        if (selectedDoc) combinedDocs.set(selectedDoc.id, selectedDoc);
+        return {
+          ...previous,
+          docs: combinedDocs,
+          cards: combinedCards,
+          filtered: combinedCards,
+          selectedCardId: page === 1 ? null : previous.selectedCardId,
+          currentPreviewCard: selectedCard,
+        };
+      });
       setSearchStatus({ loading: false, error: '', total: result.total, totalPages: result.totalPages });
     }).catch(error => {
       if (error.name !== 'AbortError') setSearchStatus(previous => ({ ...previous, loading: false, error: error.message }));
     });
     return () => controller.abort();
   }, [mode, page, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.sortOrder, refreshKey]);
+
+  const loadMoreCards = useCallback(() => {
+    if (searchStatus.loading) return;
+    if (pageWindow.last < searchStatus.totalPages) setPage(pageWindow.last + 1);
+  }, [pageWindow.last, searchStatus.loading, searchStatus.totalPages]);
+
+  const loadPreviousCards = useCallback(() => {
+    if (searchStatus.loading || pageWindow.first <= 1) return;
+    setPage(pageWindow.first - 1);
+  }, [pageWindow.first, searchStatus.loading]);
 
   // Recompute filtered whenever relevant state changes
   useEffect(() => {
@@ -316,7 +372,13 @@ function AppContent() {
         setState={setState}
         showToast={showToast}
         onCardSelect={mode === 'database' ? selectDatabaseCard : undefined}
-        searchStatus={mode === 'database' ? { ...searchStatus, page, onPageChange: setPage } : undefined}
+        searchStatus={mode === 'database' ? {
+          ...searchStatus,
+          hasPrevious: pageWindow.first > 1,
+          hasMore: pageWindow.last < searchStatus.totalPages,
+          onLoadPrevious: loadPreviousCards,
+          onLoadMore: loadMoreCards,
+        } : undefined}
       />
       <ProgressOverlay progress={progress} />
       <Toast toast={toast} />

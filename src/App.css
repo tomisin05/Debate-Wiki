@@ -551,27 +551,19 @@ body {
   gap: 8px;
   align-items: center;
 }
-.pagination {
-  position: sticky;
-  bottom: 0;
+.infinite-scroll-status {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px 12px;
   border-top: 0.5px solid var(--color-border-tertiary);
   background: var(--color-background-secondary);
   font-size: 12px;
   color: var(--color-text-secondary);
 }
-.pagination button {
-  padding: 6px 10px;
-  border: 0.5px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-md);
-  background: var(--color-background-primary);
-  cursor: pointer;
-}
-.pagination button:disabled { opacity: 0.4; cursor: default; }
+.infinite-scroll-status .spinner { width: 14px; height: 14px; }
 .stored-card-body { padding: 16px 40px 28px; font-family: var(--font-serif); font-size: 13px; line-height: 1.45; }
 .stored-card-body p { margin: 0 0 8px; }
 .preview-toolbar button:disabled { opacity: 0.4; cursor: default; }

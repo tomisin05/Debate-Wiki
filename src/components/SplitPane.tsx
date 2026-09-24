@@ -8,7 +8,16 @@ interface SplitPaneProps {
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   showToast: (message: string) => void;
   onCardSelect?: (card: DebateCard) => void;
-  searchStatus?: { loading: boolean; error?: string; total: number; page: number; totalPages: number; onPageChange: (page: number) => void };
+  searchStatus?: {
+    loading: boolean;
+    error?: string;
+    total: number;
+    totalPages: number;
+    hasPrevious: boolean;
+    hasMore: boolean;
+    onLoadPrevious: () => void;
+    onLoadMore: () => void;
+  };
 }
 
 const SplitPane: React.FC<SplitPaneProps> = ({ state, setState, showToast, onCardSelect, searchStatus }) => {
@@ -51,9 +60,10 @@ const SplitPane: React.FC<SplitPaneProps> = ({ state, setState, showToast, onCar
         loading={searchStatus?.loading}
         error={searchStatus?.error}
         total={searchStatus?.total}
-        page={searchStatus?.page}
-        totalPages={searchStatus?.totalPages}
-        onPageChange={searchStatus?.onPageChange}
+        hasPrevious={searchStatus?.hasPrevious}
+        hasMore={searchStatus?.hasMore}
+        onLoadPrevious={searchStatus?.onLoadPrevious}
+        onLoadMore={searchStatus?.onLoadMore}
       />
       <CardPreview
         card={state.currentPreviewCard}
