@@ -30,6 +30,12 @@ Supported parameters:
 | `teamName` | Exact team folder match, case-insensitive |
 | `sort` | `relevance`, `year-new`, `year-old`, or `newest` |
 
+Tag-scoped queries containing the standalone words `no` or `not` use an
+additional stop-word-preserving tag index. For example,
+`q=no impact to invasion&scope=tag` requires those words to occur in the tag,
+instead of silently dropping `no` as an English stop word. Other queries keep
+using the standard English full-text index.
+
 The response contains `items`, `page`, `limit`, `total`, and `totalPages`. Each item includes its card text, ranking score, source count, and one source with the formatted paragraph XML needed by the preview.
 
 ## Card detail

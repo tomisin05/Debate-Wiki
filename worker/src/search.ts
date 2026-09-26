@@ -43,7 +43,11 @@ export class SearchRepository {
     const result = await this.pool.query(`
       with search_input as (
         select case when btrim($1::text) = '' then null
-                    else websearch_to_tsquery('english', $1::text) end as query
+                    else websearch_to_tsquery('english', $1::text) end as query,
+               case when $10::text = 'tag'
+                          and $1::text ~* '(^|[[:space:][:punct:]])(no|not)([[:space:][:punct:]]|$)'
+                    then websearch_to_tsquery('simple', $1::text)
+                    else null end as negation_tag_query
       ), matched as (
         select c.*,
                case when i.query is null then 0
@@ -60,6 +64,10 @@ export class SearchRepository {
               when 'body' then to_tsvector('english', coalesce(c.body_text, '')) @@ i.query
               else true
             end
+            and (
+              i.negation_tag_query is null
+              or to_tsvector('simple', coalesce(c.tag, '')) @@ i.negation_tag_query
+            )
           )
         )
           and ($2::integer is null or c.evidence_year >= $2)
