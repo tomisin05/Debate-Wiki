@@ -1,6 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import type { ParsedDocument } from './parser.js';
 import { PARSER_VERSION } from './parser.js';
+import { databaseUrl } from './db-config.js';
 
 export interface StoredDocumentResult {
   skipped: boolean;
@@ -11,8 +12,7 @@ export interface StoredDocumentResult {
 export class CardRepository {
   readonly pool: Pool;
 
-  constructor(connectionString = process.env.DATABASE_URL) {
-    if (!connectionString) throw new Error('DATABASE_URL is required.');
+  constructor(connectionString = databaseUrl()) {
     this.pool = new Pool({ connectionString, max: 5, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined });
   }
 

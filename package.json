@@ -28,6 +28,9 @@
     "ingest": "tsx worker/src/cli.ts",
     "ingest:dry": "tsx worker/src/cli.ts --dry-run",
     "db:verify": "tsx worker/src/verify.ts",
+    "db:check-connections": "node scripts/check-databases.mjs",
+    "db:migrate:layerbase": "node scripts/migrate-to-layerbase.mjs",
+    "db:verify:layerbase": "node scripts/verify-layerbase.mjs",
     "upload:verify": "tsx worker/src/verify-upload.ts",
     "r2:cors:verify": "tsx worker/src/verify-cors.ts"
   },

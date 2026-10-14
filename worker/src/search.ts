@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { databaseUrl } from './db-config.js';
 
 export type SearchSort = 'relevance' | 'year-new' | 'year-old' | 'newest';
 
@@ -19,8 +20,7 @@ export interface CardSearchInput {
 export class SearchRepository {
   readonly pool: Pool;
 
-  constructor(connectionString = process.env.DATABASE_URL) {
-    if (!connectionString) throw new Error('DATABASE_URL is required.');
+  constructor(connectionString = databaseUrl()) {
     this.pool = new Pool({
       connectionString,
       max: Number(process.env.SEARCH_DB_POOL_SIZE || (process.env.VERCEL ? 1 : 10)),

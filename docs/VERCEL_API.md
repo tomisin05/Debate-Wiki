@@ -21,7 +21,7 @@ R2_SECRET_ACCESS_KEY
 R2_BUCKET
 ```
 
-Use the Supabase **Transaction pooler** connection string for `DATABASE_URL`. Find it in **Supabase Dashboard → Connect → Transaction pooler**. It normally uses port `6543` and is intended for serverless functions.
+Set `LAYERBASE_DATABASE_URL` to the direct PostgreSQL connection string from the Layerbase database's **Connect** panel. The application prefers it over `DATABASE_URL` when both are present. Alternatively, set `DATABASE_URL` to the same Layerbase URL.
 
 The R2 variables are needed only by the card DOCX download function. Search and previews use PostgreSQL.
 
@@ -49,4 +49,4 @@ npm run ingest:server
 npm run dev
 ```
 
-The local `.env` retains the direct database connection because the local service is a persistent process. The Vercel `DATABASE_URL` should use the transaction pooler connection instead.
+Use the TLS-enabled Layerbase connection string in both local and deployed environments. Keep `SUPABASE_DATABASE_URL` only while a migration or rollback window is required; the running application does not use it.

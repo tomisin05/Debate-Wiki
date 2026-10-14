@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import { Client } from 'pg';
+import { databaseUrl } from './db-config.js';
 
-if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
 const client = new Client({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: databaseUrl(),
   ssl: { rejectUnauthorized: false },
 });
 

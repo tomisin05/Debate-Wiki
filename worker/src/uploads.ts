@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { databaseUrl } from './db-config.js';
 
 export interface IngestionJob {
   id: string;
@@ -19,8 +20,7 @@ export interface IngestionJob {
 export class UploadRepository {
   readonly pool: Pool;
 
-  constructor(connectionString = process.env.DATABASE_URL) {
-    if (!connectionString) throw new Error('DATABASE_URL is required.');
+  constructor(connectionString = databaseUrl()) {
     this.pool = new Pool({ connectionString, max: 5, ssl: { rejectUnauthorized: false } });
   }
 
