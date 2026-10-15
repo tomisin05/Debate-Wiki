@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AppState } from '../types';
+import { getFilters } from '../api/cards';
 
 interface SearchRowProps {
   state: AppState;
@@ -10,8 +11,35 @@ interface SearchRowProps {
 
 const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef, mode = 'local' }) => {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [schools, setSchools] = useState<string[]>([]);
+  const schoolFilterRef = useRef<HTMLDetailsElement>(null);
   const documents = Array.from(state.docs.values());
   const sections = [...new Set(state.cards.map(card => card.section).filter(Boolean))].sort();
+
+  useEffect(() => {
+    if (mode !== 'database') return;
+    const controller = new AbortController();
+    getFilters(controller.signal).then(filters => setSchools(filters.schools)).catch(error => {
+      if (error.name !== 'AbortError') console.error('Could not load school filters:', error);
+    });
+    return () => controller.abort();
+  }, [mode]);
+
+  useEffect(() => {
+    const dismissSchoolFilter = (event: PointerEvent) => {
+      const filter = schoolFilterRef.current;
+      if (filter?.open && !filter.contains(event.target as Node)) filter.open = false;
+    };
+    document.addEventListener('pointerdown', dismissSchoolFilter);
+    return () => document.removeEventListener('pointerdown', dismissSchoolFilter);
+  }, []);
+
+  const toggleSchool = (school: string) => setState(previous => ({
+    ...previous,
+    schoolFilters: previous.schoolFilters.includes(school)
+      ? previous.schoolFilters.filter(value => value !== school)
+      : [...previous.schoolFilters, school],
+  }));
 
   return <div className="search-row">
     <div className="search-wrap">
@@ -43,6 +71,27 @@ const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef, 
     {mode === 'database' ? <>
       <input className="author-filter" value={state.authorFilter}
         onChange={event => setState(previous => ({ ...previous, authorFilter: event.target.value }))} placeholder="Author" />
+      <details ref={schoolFilterRef} className="multi-filter">
+        <summary>{state.schoolFilters.length ? `${state.schoolFilters.length} school${state.schoolFilters.length === 1 ? '' : 's'}` : 'All schools'}</summary>
+        <div className="multi-filter-menu">
+          <div className="multi-filter-heading">
+            <span>Select schools</span>
+            {!!state.schoolFilters.length && <button type="button" onClick={() => setState(previous => ({ ...previous, schoolFilters: [] }))}>Clear</button>}
+          </div>
+          <div className="multi-filter-options">
+            {schools.map(school => <label key={school}>
+              <input type="checkbox" checked={state.schoolFilters.includes(school)} onChange={() => toggleSchool(school)} />
+              <span>{school}</span>
+            </label>)}
+          </div>
+        </div>
+      </details>
+      <select aria-label="Document side" value={state.sideFilter}
+        onChange={event => setState(previous => ({ ...previous, sideFilter: event.target.value as AppState['sideFilter'] }))}>
+        <option value="all">Aff &amp; Neg</option>
+        <option value="aff">Aff documents</option>
+        <option value="neg">Neg documents</option>
+      </select>
     </> : <>
       <select value={state.docFilter} onChange={event => setState(previous => ({ ...previous, docFilter: event.target.value }))}>
         <option value="">All documents</option>

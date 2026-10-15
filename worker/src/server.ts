@@ -139,8 +139,9 @@ function searchInput(params: URLSearchParams) {
     query: limited(params.get('q'), 500) ?? '', page, limit, yearMin, yearMax,
     author: limited(params.get('author'), 100),
     collection: limited(params.get('collection'), 200),
-    school: limited(params.get('school'), 200),
+    schools: limitedMany(params.getAll('school'), 200, 50),
     teamName: limited(params.get('teamName'), 200),
+    side: sideValue(params.get('side')),
     sort: requestedSort as SearchSort,
     scope: requestedScope as 'all' | 'tag' | 'cite' | 'body',
   };
@@ -159,6 +160,15 @@ function limited(value: string | null, max: number) {
   const result = value?.trim() || undefined;
   if (result && result.length > max) throw new HttpError(400, `Parameter cannot exceed ${max} characters.`);
   return result;
+}
+function limitedMany(values: string[], maxLength: number, maxItems: number) {
+  if (values.length > maxItems) throw new HttpError(400, `No more than ${maxItems} values are allowed.`);
+  return values.map(value => limited(value, maxLength)).filter((value): value is string => !!value);
+}
+function sideValue(value: string | null): 'aff' | 'neg' | undefined {
+  if (value === null || value === '') return undefined;
+  if (value !== 'aff' && value !== 'neg') throw new HttpError(400, 'Invalid side value.');
+  return value;
 }
 function apiError(response: import('node:http').ServerResponse, error: unknown) {
   const status = error instanceof HttpError || error instanceof AuthError ? error.status : 500;

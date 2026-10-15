@@ -53,6 +53,8 @@ export interface AppState {
   docFilter: string;
   sectionFilter: string;
   authorFilter: string;
+  schoolFilters: string[];
+  sideFilter: 'all' | 'aff' | 'neg';
   sortOrder: 'doc' | 'alpha' | 'year-new' | 'year-old' | 'taglen' | 'relevance' | 'newest';
   yearMin: string;
   yearMax: string;

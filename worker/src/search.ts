@@ -12,7 +12,9 @@ export interface CardSearchInput {
   author?: string;
   collection?: string;
   school?: string;
+  schools?: string[];
   teamName?: string;
+  side?: 'aff' | 'neg';
   sort: SearchSort;
   scope: 'all' | 'tag' | 'cite' | 'body';
 }
@@ -43,7 +45,7 @@ export class SearchRepository {
       with search_input as (
         select case when btrim($1::text) = '' then null
                     else websearch_to_tsquery('english', $1::text) end as query,
-               case when $10::text = 'tag'
+               case when $11::text = 'tag'
                           and $1::text ~* '(^|[[:space:][:punct:]])(no|not)([[:space:][:punct:]]|$)'
                     then websearch_to_tsquery('simple', $1::text)
                     else null end as negation_tag_query
@@ -57,7 +59,7 @@ export class SearchRepository {
           i.query is null
           or (
             c.search_vector @@ i.query
-            and case $10::text
+            and case $11::text
               when 'tag' then to_tsvector('english', coalesce(c.tag, '')) @@ i.query
               when 'cite' then to_tsvector('english', coalesce(c.cite, '')) @@ i.query
               when 'body' then to_tsvector('english', coalesce(c.body_text, '')) @@ i.query
@@ -73,15 +75,18 @@ export class SearchRepository {
           and ($3::integer is null or c.evidence_year <= $3)
           and ($4::text is null or c.author ilike '%' || $4 || '%')
           and (
-            ($5::text is null and $6::text is null and $7::text is null)
+            ($5::text is null and coalesce(cardinality($6::text[]), 0) = 0 and $7::text is null and $8::text is null)
             or exists (
               select 1
               from public.card_sources filter_source
               join public.documents filter_document on filter_document.id = filter_source.document_id
               where filter_source.card_id = c.id
                 and ($5::text is null or lower(filter_document.collection_name) = lower($5))
-                and ($6::text is null or lower(filter_document.school) = lower($6))
+                and (coalesce(cardinality($6::text[]), 0) = 0 or lower(regexp_replace(filter_document.filename, '-.*$', '')) = any($6::text[]))
                 and ($7::text is null or lower(filter_document.team_name) = lower($7))
+                and ($8::text is null
+                  or ($8::text = 'aff' and filter_document.filename ~* '(^|[-_ ])aff([-_ .]|$)')
+                  or ($8::text = 'neg' and filter_document.filename ~* '(^|[-_ ])neg([-_ .]|$)'))
             )
           )
       )
@@ -101,15 +106,21 @@ export class SearchRepository {
         from public.card_sources cs
         join public.documents d on d.id = cs.document_id
         where cs.card_id = c.id
+          and ($5::text is null or lower(d.collection_name) = lower($5))
+          and (coalesce(cardinality($6::text[]), 0) = 0 or lower(regexp_replace(d.filename, '-.*$', '')) = any($6::text[]))
+          and ($7::text is null or lower(d.team_name) = lower($7))
+          and ($8::text is null
+            or ($8::text = 'aff' and d.filename ~* '(^|[-_ ])aff([-_ .]|$)')
+            or ($8::text = 'neg' and d.filename ~* '(^|[-_ ])neg([-_ .]|$)'))
         order by cs.created_at, cs.id
         limit 1
       ) source on true
       order by ${orderBy[input.sort]}
-      limit $8 offset $9
+      limit $9 offset $10
     `, [
       input.query, input.yearMin ?? null, input.yearMax ?? null,
-      input.author ?? null, input.collection ?? null, input.school ?? null,
-      input.teamName ?? null, input.limit, offset, input.scope,
+      input.author ?? null, input.collection ?? null, (input.schools ?? []).map(value => value.toLowerCase()),
+      input.teamName ?? null, input.side ?? null, input.limit, offset, input.scope,
     ]);
 
     const total = result.rows[0]?.total ?? 0;
@@ -144,7 +155,7 @@ export class SearchRepository {
   async filters() {
     const [collections, schools, teams, stats] = await Promise.all([
       this.pool.query(`select distinct collection_name value from public.documents where collection_name is not null and collection_name <> '' order by value`),
-      this.pool.query(`select distinct school value from public.documents where school is not null and school <> '' order by value`),
+      this.pool.query(`select distinct regexp_replace(filename, '-.*$', '') value from public.documents where filename like '%-%' order by value`),
       this.pool.query(`select distinct team_name value from public.documents where team_name is not null and team_name <> '' order by value`),
       this.pool.query(`select (select count(*)::int from public.documents where processing_status in ('completed','completed_with_warnings')) documents, (select count(*)::int from public.cards) cards`),
     ]);

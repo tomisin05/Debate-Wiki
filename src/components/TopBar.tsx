@@ -29,7 +29,7 @@ const TopBar: React.FC<TopBarProps> = ({ state, setState, onIngestFiles, showToa
       ...prev,
       docs: new Map(), cards: [], filtered: [],
       selectedCardId: null, currentPreviewBlob: null, currentPreviewCard: null,
-      nextDocId: 1, nextCardId: 1, yearMin: '', yearMax: '',
+      nextDocId: 1, nextCardId: 1, yearMin: '', yearMax: '', schoolFilters: [], sideFilter: 'all',
     }));
     showToast('All documents cleared');
   };

@@ -31,6 +31,14 @@ export function queryValue(request: ApiRequest, name: string) {
   return url.searchParams.get(name) ?? undefined;
 }
 
+export function queryValues(request: ApiRequest, name: string) {
+  const direct = request.query?.[name];
+  if (Array.isArray(direct)) return direct;
+  if (direct !== undefined) return [direct];
+  const url = new URL(request.url || '/', 'http://localhost');
+  return url.searchParams.getAll(name);
+}
+
 export function searchInput(request: ApiRequest) {
   const page = integer(queryValue(request, 'page'), 1, 1, 100000);
   const limit = integer(queryValue(request, 'limit'), 25, 1, 100);
@@ -47,8 +55,9 @@ export function searchInput(request: ApiRequest) {
     query, page, limit, yearMin, yearMax,
     author: limited(queryValue(request, 'author'), 100),
     collection: limited(queryValue(request, 'collection'), 200),
-    school: limited(queryValue(request, 'school'), 200),
+    schools: limitedMany(queryValues(request, 'school'), 200, 50),
     teamName: limited(queryValue(request, 'teamName'), 200),
+    side: sideValue(queryValue(request, 'side')),
     sort: requestedSort as SearchSort,
     scope: requestedScope as 'all' | 'tag' | 'cite' | 'body',
   };
@@ -72,4 +81,13 @@ function limited(value: string | undefined, max: number) {
   const result = value?.trim() || undefined;
   if (result && result.length > max) throw new HttpError(400, `Parameter cannot exceed ${max} characters.`);
   return result;
+}
+function limitedMany(values: string[], maxLength: number, maxItems: number) {
+  if (values.length > maxItems) throw new HttpError(400, `No more than ${maxItems} values are allowed.`);
+  return values.map(value => limited(value, maxLength)).filter((value): value is string => !!value);
+}
+function sideValue(value: string | undefined): 'aff' | 'neg' | undefined {
+  if (value === undefined || value === '') return undefined;
+  if (value !== 'aff' && value !== 'neg') throw new HttpError(400, 'Invalid side value.');
+  return value;
 }

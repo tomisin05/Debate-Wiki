@@ -33,6 +33,8 @@ const initialState: AppState = {
   docFilter: '',
   sectionFilter: '',
   authorFilter: '',
+  schoolFilters: [],
+  sideFilter: 'all',
   sortOrder: 'newest',
   yearMin: '',
   yearMax: '',
@@ -130,7 +132,7 @@ function AppContent() {
   useEffect(() => {
     if (mode !== 'database') return;
     setPage(1);
-  }, [mode, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.sortOrder, refreshKey]);
+  }, [mode, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.schoolFilters, state.sideFilter, state.sortOrder, refreshKey]);
 
   useEffect(() => {
     if (mode !== 'database') return;
@@ -140,6 +142,8 @@ function AppContent() {
     if (state.yearMin) params.set('yearMin', state.yearMin);
     if (state.yearMax) params.set('yearMax', state.yearMax);
     if (state.authorFilter) params.set('author', state.authorFilter);
+    state.schoolFilters.forEach(school => params.append('school', school));
+    if (state.sideFilter !== 'all') params.set('side', state.sideFilter);
     const apiSort = ['relevance', 'year-new', 'year-old', 'newest'].includes(state.sortOrder) ? state.sortOrder : 'newest';
     params.set('sort', apiSort);
 
@@ -197,7 +201,7 @@ function AppContent() {
       if (error.name !== 'AbortError') setSearchStatus(previous => ({ ...previous, loading: false, error: error.message }));
     });
     return () => controller.abort();
-  }, [mode, page, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.sortOrder, refreshKey]);
+  }, [mode, page, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.schoolFilters, state.sideFilter, state.sortOrder, refreshKey]);
 
   const loadMoreCards = useCallback(() => {
     if (searchStatus.loading) return;
