@@ -7,9 +7,12 @@ interface SearchRowProps {
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   searchInputRef?: React.RefObject<HTMLInputElement>;
   mode?: 'database' | 'local';
+  onDownloadFiltered?: () => void;
+  downloading?: boolean;
+  filteredTotal?: number;
 }
 
-const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef, mode = 'local' }) => {
+const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef, mode = 'local', onDownloadFiltered, downloading = false, filteredTotal = 0 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [schools, setSchools] = useState<string[]>([]);
   const schoolFilterRef = useRef<HTMLDetailsElement>(null);
@@ -92,6 +95,9 @@ const SearchRow: React.FC<SearchRowProps> = ({ state, setState, searchInputRef, 
         <option value="aff">Aff documents</option>
         <option value="neg">Neg documents</option>
       </select>
+      <button type="button" className="download-filtered-btn" onClick={onDownloadFiltered} disabled={downloading || filteredTotal === 0}>
+        {downloading ? 'Preparing…' : 'Download All'}
+      </button>
     </> : <>
       <select value={state.docFilter} onChange={event => setState(previous => ({ ...previous, docFilter: event.target.value }))}>
         <option value="">All documents</option>

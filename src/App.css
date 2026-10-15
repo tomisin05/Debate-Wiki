@@ -243,6 +243,26 @@ body {
   flex-wrap: wrap;
 }
 
+.download-filtered-btn {
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-text-primary);
+  color: var(--color-background-primary);
+  padding: 8px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.download-filtered-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.download-filtered-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .search-wrap {
   position: relative;
   flex: 1;

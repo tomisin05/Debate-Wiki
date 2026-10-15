@@ -13,6 +13,7 @@ import { processDocxFile, parseCardsFromDoc } from './utils/docxProcessor';
 import { expandUploadFiles } from './utils/archiveProcessor';
 import { SearchEngine } from './utils/searchEngine';
 import { getAdminStatus, getCard, materializeCard, searchCards, uploadArchive } from './api/cards';
+import { downloadCardsDocx } from './utils/cardExport';
 import './App.css';
 
 const searchEngine = new SearchEngine();
@@ -111,11 +112,24 @@ function AppContent() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [downloadingFiltered, setDownloadingFiltered] = useState(false);
 
   const showToast = useCallback((message: string) => {
     setToast({ show: true, message });
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 2200);
   }, []);
+
+  const searchParams = useCallback((requestedPage: number, limit = 25, query = debouncedSearch) => {
+    const params = new URLSearchParams({ page: String(requestedPage), limit: String(limit), scope: state.searchScope });
+    if (query) params.set('q', query);
+    if (state.yearMin) params.set('yearMin', state.yearMin);
+    if (state.yearMax) params.set('yearMax', state.yearMax);
+    if (state.authorFilter) params.set('author', state.authorFilter);
+    state.schoolFilters.forEach(school => params.append('school', school));
+    if (state.sideFilter !== 'all') params.set('side', state.sideFilter);
+    params.set('sort', ['relevance', 'year-new', 'year-old', 'newest'].includes(state.sortOrder) ? state.sortOrder : 'newest');
+    return params;
+  }, [debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.schoolFilters, state.sideFilter, state.sortOrder]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(state.search), 300);
@@ -137,15 +151,7 @@ function AppContent() {
   useEffect(() => {
     if (mode !== 'database') return;
     const controller = new AbortController();
-    const params = new URLSearchParams({ page: String(page), limit: '25', scope: state.searchScope });
-    if (debouncedSearch) params.set('q', debouncedSearch);
-    if (state.yearMin) params.set('yearMin', state.yearMin);
-    if (state.yearMax) params.set('yearMax', state.yearMax);
-    if (state.authorFilter) params.set('author', state.authorFilter);
-    state.schoolFilters.forEach(school => params.append('school', school));
-    if (state.sideFilter !== 'all') params.set('side', state.sideFilter);
-    const apiSort = ['relevance', 'year-new', 'year-old', 'newest'].includes(state.sortOrder) ? state.sortOrder : 'newest';
-    params.set('sort', apiSort);
+    const params = searchParams(page);
 
     setSearchStatus(previous => ({ ...previous, loading: true, error: '' }));
     searchCards(params, controller.signal).then(result => {
@@ -201,7 +207,30 @@ function AppContent() {
       if (error.name !== 'AbortError') setSearchStatus(previous => ({ ...previous, loading: false, error: error.message }));
     });
     return () => controller.abort();
-  }, [mode, page, debouncedSearch, state.searchScope, state.yearMin, state.yearMax, state.authorFilter, state.schoolFilters, state.sideFilter, state.sortOrder, refreshKey]);
+  }, [mode, page, searchParams, refreshKey]);
+
+  const downloadFilteredCards = useCallback(async () => {
+    if (downloadingFiltered || searchStatus.total === 0) return;
+    setDownloadingFiltered(true);
+    setProgress({ show: true, label: 'Loading filtered cards…', percent: 0 });
+    try {
+      const first = await searchCards(searchParams(1, 100, state.search.trim()));
+      const items = [...first.items];
+      for (let currentPage = 2; currentPage <= first.totalPages; currentPage++) {
+        setProgress({ show: true, label: `Loading filtered cards: ${items.length.toLocaleString()} of ${first.total.toLocaleString()}`, percent: (currentPage - 1) / first.totalPages * 90 });
+        const result = await searchCards(searchParams(currentPage, 100, state.search.trim()));
+        items.push(...result.items);
+      }
+      setProgress({ show: true, label: `Building document with ${items.length.toLocaleString()} cards…`, percent: 95 });
+      await downloadCardsDocx(items);
+      showToast(`Downloaded ${items.length.toLocaleString()} filtered cards`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not download filtered cards');
+    } finally {
+      setDownloadingFiltered(false);
+      setProgress(previous => ({ ...previous, show: false }));
+    }
+  }, [downloadingFiltered, searchStatus.total, searchParams, state.search, showToast]);
 
   const loadMoreCards = useCallback(() => {
     if (searchStatus.loading) return;
@@ -369,7 +398,8 @@ function AppContent() {
         onReturnLibrary={returnToLibrary}
         isAdmin={import.meta.env.DEV && isAdmin}
       />
-      <SearchRow state={state} setState={setState} searchInputRef={searchInputRef} mode={mode} />
+      <SearchRow state={state} setState={setState} searchInputRef={searchInputRef} mode={mode}
+        onDownloadFiltered={downloadFilteredCards} downloading={downloadingFiltered} filteredTotal={searchStatus.total} />
       <YearFilterRow state={state} setState={setState} mode={mode} />
       <SplitPane
         state={state}
