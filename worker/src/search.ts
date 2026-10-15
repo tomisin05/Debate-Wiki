@@ -25,7 +25,6 @@ export class SearchRepository {
       connectionString,
       max: Number(process.env.SEARCH_DB_POOL_SIZE || (process.env.VERCEL ? 1 : 10)),
       ssl: { rejectUnauthorized: false },
-      statement_timeout: 5000,
       query_timeout: 6000,
     });
   }
